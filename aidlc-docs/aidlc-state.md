@@ -5,13 +5,13 @@
 - **Workspace**: `/home/hj/aidlc-workshop/hackerthon/arduino-simulator-aidlc/` (git worktree, branch `aidlc-retarget`)
 - **Project Type**: **Brownfield** (existing application code present)
 - **Objective**: Retarget the physical/simulated YES/NO button bridge so it drives a running **Claude Code** session instead of Codex.
-- **Hardware surface (updated 2026-09-08)**: **BindDeck** (SanX18/BindDeck) — ESP32 macro pad (OLED + KY-040 encoder + 8 switches, USB serial `BTN:`/`ENC:` protocol) replaces the UNO R4 WiFi two-button design. See `inception/reverse-engineering/external-binddeck-reference.md`.
+- **Hardware surface (submission, updated 2026-09-08)**: **Arduino UNO R4 WiFi** + 128×64 SSD1306 OLED + two physical buttons (✓ APPROVE = D2, ✕ REJECT = D3). Transport: button → WiFi 2.4GHz → WebSocket → Node Bridge (`ws://…:8080`) → app PTY approval seam. Firmware `firmware/resenne_uno_r4/`; button→bridge round-trip verified on real hardware 2026-09-07~08 (30ms debounce, 21 clean presses); OLED + D3 REJECT confirmed on-device via the team button-test sketch, then integrated. Node Bridge ↔ Python(PTY) thin adapter = remaining integration (`HACKATHON_EXECUTION_PLAN.md` §2). **Earlier exploration paths (retained as docs):** BindDeck ESP32 USB-serial (`firmware/binddeck_claude/`, `inception/reverse-engineering/external-binddeck-reference.md`) and the initial UNO R4 two-button USB-serial sketch (`firmware/yes_no/`).
 
 ## Current Phase
 - **Phase**: CONSTRUCTION
 - **Active Stage**: Build & Test — complete (auto-proceeding per user instruction "자동진행해"). Ready for OPERATIONS (placeholder) / final commit.
 - **Unit**: `claude-binddeck-retarget` (single unit)
-- **Verification (2026-09-08)**: 43 tests pass (31 Python via `.venv` unittest incl. Hypothesis PBT; 12 JS via `node --test` incl. fast-check PBT). Syntax gates (`node --check`, `py_compile`) pass. Manual Claude-keystroke + real-BindDeck smoke tests deferred (no CLI/hardware in this env) — see build-and-test docs.
+- **Verification (re-measured 2026-09-08)**: **45 tests pass** (33 Python via `.venv` unittest incl. Hypothesis PBT; 12 JS via `node --test` incl. fast-check PBT). Syntax gates (`node --check`, `py_compile`) pass. **Real-hardware (UNO R4 WiFi):** physical button → WebSocket → Node Bridge round-trip confirmed on device (2026-09-07~08); OLED + D3 REJECT confirmed via the team button-test sketch. Deferred: live-`claude` keystroke smoke + the Node Bridge↔PTY adapter end-to-end integration — see build-and-test docs and `HACKATHON_EXECUTION_PLAN.md` §2.
 
 ## Extension Configuration
 | Extension | Enabled | Mode | Decided At | Notes |
@@ -47,5 +47,5 @@ All 10 requirement decisions were auto-confirmed via installed GPT (Codex CLI, m
 | CONSTRUCTION | Functional Design / NFR | ⏭️ Folded into Application Design |
 | CONSTRUCTION | Infrastructure Design | ⏭️ Skipped (no cloud/deploy) |
 | CONSTRUCTION | Code Generation | ✅ Completed |
-| CONSTRUCTION | Build & Test | ✅ Completed (43 tests pass; docs in construction/build-and-test/) |
+| CONSTRUCTION | Build & Test | ✅ Completed (45 tests pass; docs in construction/build-and-test/) |
 | OPERATIONS | — | ⬜ Placeholder (out of scope) |

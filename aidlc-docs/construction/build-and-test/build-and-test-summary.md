@@ -1,26 +1,27 @@
 # Build & Test Summary — `claude-binddeck-retarget`
 
-Single unit retargeting the Button Lab bridge from Codex → **Claude Code** and from
-UNO R4 → **BindDeck** (ESP32). Runtime stays zero-dependency; test-only deps are
-`fast-check` (npm, gitignored `node_modules/`) and `hypothesis` (local `.venv/`,
-gitignored — PEP 668 base env).
+Single unit retargeting the Button Lab bridge from Codex → **Claude Code**. The **submission
+hardware is Arduino UNO R4 WiFi** (`firmware/resenne_uno_r4/`, ✓ D2 / ✕ D3 buttons + SSD1306 OLED
+over WiFi/WebSocket); the BindDeck ESP32 USB-serial fork is retained as an earlier exploration path.
+Runtime stays zero-dependency; test-only deps are `fast-check` (npm, gitignored `node_modules/`)
+and `hypothesis` (local `.venv/`, gitignored — PEP 668 base env).
 
 ## Commands
 
 ```bash
 npm install && python3 -m venv .venv && ./.venv/bin/pip install hypothesis   # once
 npm test                                                                     # 12 JS tests
-./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 31 Python tests
+./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 33 Python tests
 python3 server.py                                                            # run app
 ```
 
-## Result (this run, 2026-09-08)
+## Result (re-measured 2026-09-08)
 
 | Suite | Command | Result |
 |---|---|---|
-| Python unit + property | `unittest discover` (venv) | **31 passed** |
+| Python unit + property | `unittest discover` (venv) | **33 passed** |
 | JS unit + property | `node --test tests/*.test.js` | **12 passed** |
-| **Total** | | **43 passed, 0 failed** |
+| **Total** | | **45 passed, 0 failed** |
 
 Syntax gates: `node --check` on `app.js`/`web-terminal.js`/`serial.js` and
 `py_compile` on `server.py`/`terminal.py`/`claude_state.py`/`hooks/claude_state_hook.py`
@@ -39,12 +40,18 @@ all Codex/UNO artifacts (`terminal-codex`, `terminal-yolo`, `button-target`,
   `tests/test_mapping_pbt.py` (totality, purity, table consistency for the pure
   mappings; send_choice totality/consistency for the action→keys table).
 
-## Not yet verified (requires environment/hardware)
+## Verified on hardware / not yet verified
 
-1. Real key-sequence smoke test against a live `claude` permission menu — may adjust
-   `ACTION_KEYS` literal bytes only (no logic/test change).
-2. Real BindDeck upload + button/encoder/OLED behavior over USB.
-3. Firmware is not compiled here (no embedded toolchain) — correctness by inspection.
+- **Verified (UNO R4 WiFi, 2026-09-07~08):** physical button → WiFi → WebSocket → Node Bridge
+  round-trip on real hardware (30ms debounce, 21 clean presses); OLED + D3 REJECT confirmed via the
+  team button-test sketch and integrated into `firmware/resenne_uno_r4/`.
+- **Not yet verified:**
+  1. Live `claude` permission-menu key-sequence smoke test — may adjust `ACTION_KEYS` literal bytes
+     only (no logic/test change).
+  2. Node Bridge ↔ Python(PTY) thin adapter end-to-end (remaining integration, plan §2).
+  3. Firmware not compiled in this env (no `arduino-cli`/toolchain) — correctness by inspection;
+     flash / on-device confirmation performed by the team.
+  4. BindDeck (ESP32, USB serial) upload — earlier exploration path, not the submission hardware.
 
 ## Provenance / licensing note
 

@@ -1,11 +1,25 @@
-# Button Lab · BindDeck × Claude Code
+# Re:senne HUMAN GATE — 실물 버튼으로 실행하는 Claude Code 승인
 
-웹 버튼 또는 실물 **BindDeck**(ESP32 매크로패드) 버튼·엔코더로, 이 컴퓨터에서 실행 중인
-**Claude Code** 세션의 승인 프롬프트에 답합니다. 브라우저에서 쉘과 Claude를 실행하는 웹 터미널과
-USB 시리얼 모니터를 제공합니다.
+물리 버튼(또는 웹 시뮬레이션)으로, 이 컴퓨터에서 실행 중인 **Claude Code** 세션의 승인 프롬프트에
+답합니다. AI가 준비하면 OLED가 사람을 부르고, 버튼을 누르면 실제 코드 변경이 진행됩니다. 브라우저에서
+쉘과 Claude를 실행하는 웹 터미널과 상태 표시도 제공합니다.
 
-이전 버전은 Arduino UNO R4 WiFi의 YES / NO 버튼으로 Codex에 답했습니다. 이 버전은 하드웨어를
-**BindDeck**으로, 대상 에이전트를 **Claude Code**로 재타깃했습니다(AI-DLC 산출물: `aidlc-docs/`).
+> **제4회 디디톤 출품작 · 팀 리센느.** "코딩은 Claude가. 승인은 리센느가." (AI-DLC 산출물: `aidlc-docs/`)
+
+## 하드웨어 (제출 기준 = Arduino UNO R4 WiFi)
+
+- **제출·검증 하드웨어 = Arduino UNO R4 WiFi** + 128×64 SSD1306 OLED + 물리 버튼 2개
+  (✓ **APPROVE** = D2, ✕ **REJECT** = D3). 펌웨어 = **`firmware/resenne_uno_r4/`**.
+- 전송 경로 = 버튼 → UNO R4 WiFi(2.4GHz) → WebSocket → Node Bridge(`ws://…:8080`) → 앱의 PTY 승인 seam.
+  **버튼→브리지 왕복을 실기기에서 검증**(2026-09-07~08, 30ms 디바운스 21회 클린). OLED·D3 버튼은
+  팀 버튼 테스트 스케치로 실기기 확인한 뒤 이 펌웨어에 통합했습니다. **Node Bridge ↔ Python(PTY) 얇은
+  어댑터 연결은 통합 남은 작업**입니다(`HACKATHON_EXECUTION_PLAN.md` §2).
+- **초기 탐색 경로(문서 보존)**: `firmware/binddeck_claude/`(BindDeck ESP32 매크로패드, USB 시리얼)와
+  `firmware/yes_no/`(UNO R4 초기 2버튼 USB 시리얼). 아래 "동작 방식·시리얼 규약"은 **이 USB 시리얼
+  전송**을 설명하며, 현재 이 저장소에서 바로 실행되는 경로입니다. UNO R4 WiFi 경로는 같은 PTY 승인
+  seam에 WebSocket(Node Bridge)로 도달합니다.
+
+> ⚠️ 이전 문서 일부는 최종 HW를 BindDeck ESP32로 적었으나, **제출 기준 하드웨어는 UNO R4 WiFi**입니다.
 
 ## 동작 방식 (요약)
 
@@ -17,7 +31,8 @@ USB 시리얼 모니터를 제공합니다.
 - Claude 세션 상태는 **Claude Code 훅**(`.claude/settings.json` → `hooks/claude_state_hook.py`)이
   상태 파일에 기록하고, 서버가 이를 읽어 `/api/state`로 노출합니다. 훅 파일이 없거나 오래되면
   트랜스크립트 **수정 시각(mtime)만** 참고하는 폴백을 사용합니다(스키마는 절대 파싱하지 않음).
-- 브라우저는 상태를 폴링해 실물 BindDeck의 **OLED**에 표시합니다(`CMD:MSG:`).
+- 브라우저는 상태를 폴링해 USB 시리얼 기기(BindDeck)의 **OLED**에 표시합니다(`CMD:MSG:`).
+  UNO R4 WiFi 펌웨어는 상태를 WebSocket으로 직접 받아 OLED에 표시합니다.
 
 ## 설치와 실행
 
@@ -65,7 +80,28 @@ Claude 세션이 앱 소유 PTY에서 실행 중일 때만 버튼이 활성화�
 
 이 시뮬레이션은 버튼·시리얼 동작을 재현합니다. ESP32 CPU나 펌웨어 실행을 에뮬레이션하지는 않습니다.
 
-## 실물 BindDeck 연결
+## 실물 UNO R4 WiFi 연결 (제출 기준)
+
+준비물: Arduino UNO R4 WiFi, 128×64 SSD1306 OLED(I2C), 물리 버튼 2개, USB 케이블, 2.4GHz AP.
+
+1. Arduino IDE에 **UNO R4 보드 패키지(renesas_uno)**와 라이브러리 **WebSockets(Links2004)**,
+   **Adafruit SSD1306 · Adafruit GFX · Adafruit BusIO**를 설치합니다(WiFiS3·Arduino_LED_Matrix·Wire는 코어 번들).
+2. `firmware/resenne_uno_r4/resenne_uno_r4.ino`를 열고, 상단의 `WIFI_SSID`/`WIFI_PASS`/`BRIDGE_HOST`를
+   **로컬에서만** 채웁니다(저장소에는 placeholder만 커밋 — 자격증명 금지).
+3. 배선: 버튼 D2(✓)/D3(✕) ↔ GND, OLED SDA=A4·SCL=A5·GND 공통.
+   ⚠️ A4/A5에는 보드 5V 풀업이 있으므로 **5V I2C를 견디는 OLED 모듈**을 쓰거나 레벨 변환하세요.
+4. 보드를 선택해 업로드합니다. OLED에 `OFFLINE` → 연결되면 `READY`가 뜹니다.
+5. 앱 쪽에서 Node Bridge(`ws://…:8080`)를 띄우고, 보드가 2.4GHz AP에 접속해 WebSocket으로 붙으면
+   상태(`REVIEW_REQUIRED`→`YOUR TURN`)가 OLED에 뜨고 ✓/✕ 버튼이 대기 요청에 전송됩니다.
+
+OLED 상태 표기: IDLE=`READY`, RUNNING=`AI'S TURN`, **REVIEW_REQUIRED=`YOUR TURN` / `PRESS TO APPROVE`**,
+SUCCESS=`DONE`, ERROR=`ERROR`, DISCONNECTED=`OFFLINE`. 자동 승인은 꺼져 있어 **사람이 눌러야만** 진행합니다.
+
+> **검증 상태:** 버튼→WiFi→WebSocket→Node Bridge 왕복은 실기기 확인. Node Bridge ↔ 기존 Python PTY
+> 승인 처리(`server.py`)를 잇는 얇은 어댑터는 통합 남은 작업입니다(`HACKATHON_EXECUTION_PLAN.md` §2).
+> 현재 이 저장소에서 바로 실행되는 완성 경로는 아래 **USB 시리얼(BindDeck)** 연결입니다.
+
+## 실물 BindDeck 연결 (초기 탐색 경로)
 
 준비물: BindDeck(ESP32-WROOM-32 + SSD1306 OLED + KY-040 엔코더 + 8 스위치), USB **데이터 케이블**.
 
@@ -131,7 +167,9 @@ python3 -m venv .venv && ./.venv/bin/pip install hypothesis
 
 프런트엔드 라이브러리는 `vendor/`에 포함되어 있으며 해당 LICENSE 파일을 함께 배포하세요.
 
-참고: [Chrome Web Serial](https://developer.chrome.com/docs/capabilities/serial),
+참고: [Arduino UNO R4 WiFi](https://docs.arduino.cc/hardware/uno-r4-wifi/),
+[WebSockets (Links2004)](https://github.com/Links2004/arduinoWebSockets),
+[Chrome Web Serial](https://developer.chrome.com/docs/capabilities/serial),
 [BindDeck (SanX18)](https://github.com/SanX18/BindDeck),
 [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks),
 [xterm.js](https://xtermjs.org/).

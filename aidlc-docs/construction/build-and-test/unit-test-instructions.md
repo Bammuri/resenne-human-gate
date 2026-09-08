@@ -28,4 +28,4 @@ npm test        # == node --test tests/*.test.js
   mapping is asserted directly in `test_terminal.py` / `test_mapping_pbt.py`.
 - `test_terminal.py` uses `cat` as a long-lived stand-in for `claude` to exercise a
   real PTY and `claude_ready()` without requiring the CLI.
-- Expected result: **43 passed, 0 failed** (31 Python + 12 Node).
+- Expected result: **45 passed, 0 failed** (33 Python + 12 Node).
