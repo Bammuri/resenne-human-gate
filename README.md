@@ -100,6 +100,14 @@ python3 server.py --port 8766
 
 > 표의 이름·역할·인원은 실제 팀 구성에 맞춰 제출 전 채워 주세요.
 
+## 라이선스
+
+프로젝트 소스(서버·웹 터미널·펌웨어·훅·테스트·문서)는 **Apache License 2.0**으로 배포합니다 — 루트
+[`LICENSE`](./LICENSE), 저작권·적용 범위·제3자 고지는 [`NOTICE`](./NOTICE)를 참고하세요. 프런트엔드
+라이브러리 `xterm.js`·`addon-fit`는 `vendor/`에 포함된 제3자(MIT) 구성요소로 각자의 라이선스를
+유지합니다(`vendor/xterm-LICENSE`, `vendor/addon-fit-LICENSE`). 이 라이선스는 물리 하드웨어 설계나
+팀 사진 키캡 이미지의 권리까지 보장하지는 않습니다. (라이선스 최종 확정은 팀 검토 후 이루어집니다.)
+
 ## 시연 (스크린샷·영상)
 
 > _(제출 전 실제 이미지로 교체)_ 시연 스크린샷은 현재 미첨부입니다. 제출 전 `screenshots/`에
@@ -255,8 +263,9 @@ python3 -m venv .venv && ./.venv/bin/pip install hypothesis
 
 빌드·테스트 상세 절차는 `aidlc-docs/construction/build-and-test/`를 참고하세요.
 
-프런트엔드 라이브러리는 `vendor/`에 포함되어 있으며 해당 LICENSE 파일을 함께 배포하세요. 프로젝트
-자체 라이선스는 아직 지정하지 않았습니다(현재 **소스 공개 PoC**).
+프런트엔드 라이브러리는 `vendor/`에 포함되며 각 LICENSE 파일(`vendor/xterm-LICENSE`·
+`vendor/addon-fit-LICENSE`)을 함께 배포합니다. 프로젝트 라이선스(Apache-2.0)는 위
+[`## 라이선스`](#라이선스) 절과 루트 `LICENSE`·`NOTICE`를 참고하세요.
 
 참고: [Arduino UNO R4 WiFi](https://docs.arduino.cc/hardware/uno-r4-wifi/),
 [WebSockets (Links2004)](https://github.com/Links2004/arduinoWebSockets),

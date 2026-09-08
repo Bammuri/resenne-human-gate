@@ -1,0 +1,24 @@
+Re:senne HUMAN GATE
+Copyright 2026 Re:senne (리센느) team
+
+This product is licensed under the Apache License, Version 2.0 (the
+"License"); see the LICENSE file. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The Apache-2.0 license above covers the source code authored by the Re:senne
+team (the server, web terminal, firmware sketches, Claude Code hooks, tests,
+and documentation in this repository). It does not purport to grant rights
+over the physical hardware design or the team-photo keycap artwork.
+
+Third-party components retain their own licenses and are not relicensed here:
+
+  - @xterm/xterm      (vendor/xterm.js, vendor/xterm.css) — MIT;
+                      see vendor/xterm-LICENSE
+  - @xterm/addon-fit  (vendor/addon-fit.js)               — MIT;
+                      see vendor/addon-fit-LICENSE
+
+The Arduino libraries referenced by the firmware (WiFiS3, Arduino_LED_Matrix,
+Wire, WebSockets by Links2004, Adafruit SSD1306 / GFX / BusIO) are installed by
+the user and remain under their respective upstream licenses; they are not
+redistributed in this repository.

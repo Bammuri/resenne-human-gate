@@ -123,3 +123,11 @@ The following raw user inputs were received (in order) during the session that l
 **Context**: Post-Build & Test doc/firmware unification for 제4회 디디톤 submission. Auto-proceed per '한번에 하자 … 자동진행해'.
 
 ---
+
+## LICENSE 추가 + PoC 임포트 보류 결정 (게이트 작업 ①·② — astra 자문 후 auto-proceed)
+**Timestamp**: 2026-09-08T12:51:50Z
+**User Input**: "다음 plan에 따라 ai dlc 방법론 적용해서 계속 진행하자 모르는건 gpt astra low로 자문구하고 계속 끝까지 진행"
+**AI Response**: "게이트된 남은 작업(①B-검증 PoC 임포트, ②LICENSE 명시, ③재현·안전 확인, ④무편집 영상+히어로컷) 중 하드웨어·카메라 없이 안전하게 100% 완결 가능한 항목만 처리. 진짜 불확실점(①임포트 여부)은 gpt-6-astra(reasoning=low)에 자문. **astra 확정 결정:** (Q1 우선순위=B) 브로커+hook+어댑터를 제출 repo로 이식하지 **않는다** — 소프트웨어 단위테스트만 붙은 미-E2E 브로커는 '검증 안 된 두 번째 승인 경로'가 되어 ★최우선 '한 경로 정합' 원칙을 흐리는 순손실이며, present-tense 게이트 주장의 전제인 '제출버전 E2E 통과'를 무하드웨어 에이전트가 만족 못 함. PTY 키응답 경로를 제출 유일 검증 경로로 확정, hook 게이트는 '통합 예정' 유지. (Q3 LICENSE=Apache-2.0) 특허 조항 명시가 HW+SW PoC에 유리. (Q4 펌웨어 request_id echo TODO) 실물 flash·검증 불가 상태의 미검증 펌웨어 변경은 위험 → 사람이 flash·검증할 때까지 **TODO로 유지**. **할 일:** LICENSE·audit.md·증거수집 안내 완결, 팀에 PTY 승인·거절 재검증+촬영 인계. **하지 말 일:** 브로커 이식, 미검증 펌웨어 변경, 불필요한 문서 수정, 스크린샷 골격을 증거로 계산. **실행한 조치:** (1) 루트 `LICENSE` = Apache-2.0 verbatim(canonical apache.org 원문 fetch, 11358 bytes) 추가; (2) 루트 `NOTICE` 추가 — 저작권 'Re:senne (리센느) team', Apache-2.0 적용 범위(소스=서버·웹터미널·펌웨어·훅·테스트·문서), 물리 HW 설계/팀 사진 키캡은 미보장 명시, 제3자 vendor(xterm.js·addon-fit=MIT, vendor/xterm-LICENSE·vendor/addon-fit-LICENSE)·Arduino 라이브러리는 각자 라이선스 유지(미재배포); (3) README에 `## 라이선스` 절 신설 + 푸터 '소스 공개 PoC/미지정' → Apache-2.0 서술로 교체(라이선스 최종 확정=팀 검토 후 명시); (4) CONCEPT_FINAL.md(§6 위험목록·§7 남은작업 2번)·HACKATHON_EXECUTION_PLAN.md(§상단 확정갱신 블록) 라이선스 상태 라인을 'Apache-2.0 추가·팀 sign-off 대기'로 동기화; (5) `screenshots/README.md` 촬영 안내(3컷+무음영상 가이드, '증거 아님' 명시) 추가. **미수행(사람 몫으로 인계):** 브로커/hook 게이트 이식(범위=PTY 확정), 펌웨어 request_id echo(TODO 유지), 제출버전 PTY 승인·거절 3회 재검증, 무편집 B영상+히어로컷 촬영, 팀원 실명 기입, LICENSE 팀 최종 sign-off."
+**Context**: 제4회 디디톤 제출 마감(9/9 17:00) 직전 게이트 작업. AI-DLC OPERATIONS 성격(제출 산출물 정합·라이선스·증거 안내). 기존 45개 테스트(33 Python+12 JS)는 파일·문서 추가만 했으므로 회귀 없음 확인 예정. astra 자문 원문 = `/home/hj/.claude/jobs/fc63d226/tmp/astra_import_out.txt`. auto-proceed per Request B("계속 끝까지 진행 모르는건 gpt astra low로 자문").
+
+---
