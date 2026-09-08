@@ -1,0 +1,183 @@
+"""Unit tests for the allow/deny PreToolUse approval broker (unit = approval-gate).
+
+Scope: SW unit verification only — the broker's dedup/atomic-resolve/deadline/token-role
+behaviour and the /api/approval endpoints. The end-to-end path (physical button -> broker ->
+real Claude tool gate) is NOT exercised here; that is a human re-verification step on the
+submission build. The PTY key path (/api/press, tests/test_server.py) is the sole E2E-verified
+submission path.
+"""
+
+import http.client
+import json
+from pathlib import Path
+import sys
+import tempfile
+import threading
+import time
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from server import SimulatorServer, summarize_tool
+
+
+class ApprovalBrokerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.workspace = Path(self.temp.name)
+        state_file = self.workspace / ".claude" / "binddeck-state.json"
+        self.server = SimulatorServer(("127.0.0.1", 0), "claude", self.workspace, state_file)
+        self.worker = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.worker.start()
+
+    def tearDown(self):
+        self.server.terminal.stop()
+        self.server.shutdown()
+        self.server.server_close()
+        self.worker.join()
+        self.temp.cleanup()
+
+    def post(self, path, body, token=None, headers=None):
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        request_headers = {"Content-Type": "application/json"}
+        if token is not None:
+            request_headers["X-Simulator-Token"] = token
+        request_headers.update(headers or {})
+        conn.request("POST", path, json.dumps(body), request_headers)
+        response = conn.getresponse()
+        result = response.status, json.loads(response.read())
+        conn.close()
+        return result
+
+    def get(self, path, token=None):
+        conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        headers = {"X-Simulator-Token": token} if token is not None else {}
+        conn.request("GET", path, headers=headers)
+        response = conn.getresponse()
+        result = response.status, json.loads(response.read())
+        conn.close()
+        return result
+
+    # --- broker semantics (in-process) ---------------------------------
+
+    def test_create_dedups_by_tool_use_id_while_pending(self):
+        first = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        second = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.assertEqual(first, second)
+        self.assertEqual(self.server.list_pending()["count"], 1)
+
+    def test_resolve_is_atomic_and_a_second_resolve_conflicts(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "rm -rf x"})
+        self.assertIsNotNone(self.server.resolve_approval(approval_id, "allow"))
+        # A late or duplicate resolve finds nothing pending: the first decision stands.
+        self.assertIsNone(self.server.resolve_approval(approval_id, "deny"))
+        self.assertEqual(self.server.wait_for_decision(approval_id), "allow")
+
+    def test_wait_returns_decision_set_concurrently(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Write", {"file_path": "/tmp/x"})
+
+        def resolver():
+            time.sleep(0.05)
+            self.server.resolve_approval(approval_id, "deny")
+
+        threading.Thread(target=resolver, daemon=True).start()
+        self.assertEqual(self.server.wait_for_decision(approval_id), "deny")
+
+    def test_wait_on_unknown_approval_falls_back_to_ask(self):
+        self.assertEqual(self.server.wait_for_decision("does-not-exist"), "ask")
+
+    def test_end_session_expires_its_pending_approvals(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.server.register_session("b1", "s1")
+        self.server.end_session("b1", "s1")
+        self.assertEqual(self.server.list_pending()["count"], 0)
+        self.assertEqual(self.server.wait_for_decision(approval_id), "ask")
+
+    def test_summarize_tool_is_human_readable_and_bounded(self):
+        self.assertEqual(summarize_tool("Bash", {"command": "ls -la"}), "ls -la")
+        self.assertEqual(summarize_tool("Write", {"file_path": "/tmp/x"}), "file_path: /tmp/x")
+        self.assertLessEqual(len(summarize_tool("Bash", {"command": "x" * 500})), 240)
+        self.assertEqual(summarize_tool("Read", "not-a-dict"), "Read")
+
+    # --- endpoints and token roles -------------------------------------
+
+    def test_approval_list_requires_ui_or_device_token(self):
+        self.assertEqual(self.get("/api/approval", token="")[0], 403)
+        self.assertEqual(self.get("/api/approval", token=self.server.hook_token)[0], 403)
+        status, body = self.get("/api/approval", token=self.server.ui_token)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["count"], 0)
+
+    def test_wait_endpoint_requires_hook_token_and_validates_payload(self):
+        good = {"bridge_id": "b1", "tool_name": "Bash", "tool_use_id": "tu1", "tool_input": {"command": "ls"}}
+        self.assertEqual(self.post("/api/approval/wait", good, token=self.server.ui_token)[0], 403)
+        self.assertEqual(self.post("/api/approval/wait", {"tool_name": "Bash"}, token=self.server.hook_token)[0], 400)
+        self.assertEqual(self.post("/api/approval/wait", {"bridge_id": "b1"}, token=self.server.hook_token)[0], 400)
+        self.assertEqual(self.server.list_pending()["count"], 0)
+
+    def test_wait_endpoint_end_to_end_hook_cannot_self_approve(self):
+        result = {}
+
+        def waiter():
+            result["value"] = self.post(
+                "/api/approval/wait",
+                {"bridge_id": "b1", "session_id": "s1", "tool_use_id": "tu1",
+                 "tool_name": "Bash", "tool_input": {"command": "ls"}},
+                token=self.server.hook_token,
+            )
+
+        worker = threading.Thread(target=waiter, daemon=True)
+        worker.start()
+        approval_id = None
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            pending = self.get("/api/approval", token=self.server.ui_token)[1]["pending"]
+            if pending:
+                approval_id = pending[0]["id"]
+                break
+            time.sleep(0.02)
+        self.assertIsNotNone(approval_id, "hook wait never registered a pending approval")
+        # The hook token registered the request but must NOT be able to resolve it.
+        self.assertEqual(self.post("/api/approval/resolve",
+                                   {"approval_id": approval_id, "decision": "allow"},
+                                   token=self.server.hook_token)[0], 403)
+        # The browser (ui token) resolves it.
+        status, body = self.post("/api/approval/resolve",
+                                 {"approval_id": approval_id, "decision": "allow"},
+                                 token=self.server.ui_token)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["tool_name"], "Bash")
+        worker.join(timeout=5)
+        self.assertEqual(result["value"][0], 200)
+        self.assertEqual(result["value"][1]["decision"], "allow")
+        # A second resolve conflicts.
+        self.assertEqual(self.post("/api/approval/resolve",
+                                   {"approval_id": approval_id, "decision": "deny"},
+                                   token=self.server.ui_token)[0], 409)
+
+    def test_device_token_may_resolve(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        status, body = self.post("/api/approval/resolve",
+                                 {"approval_id": approval_id, "decision": "deny"},
+                                 token=self.server.device_token)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.server.wait_for_decision(approval_id), "deny")
+
+    def test_resolve_rejects_bad_input(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.assertEqual(self.post("/api/approval/resolve",
+                                   {"approval_id": approval_id, "decision": "maybe"},
+                                   token=self.server.ui_token)[0], 400)
+        self.assertEqual(self.post("/api/approval/resolve", {"decision": "allow"},
+                                   token=self.server.ui_token)[0], 400)
+
+    def test_session_lifecycle_requires_hook_token(self):
+        registration = {"bridge_id": "b1", "session_id": "s1"}
+        self.assertEqual(self.post("/api/session/register", registration, token=self.server.ui_token)[0], 403)
+        self.assertEqual(self.post("/api/session/register", registration, token=self.server.hook_token)[0], 200)
+        self.assertEqual(self.get("/api/approval", token=self.server.ui_token)[1]["sessions"], 1)
+        self.assertEqual(self.post("/api/session/end", registration, token=self.server.hook_token)[0], 200)
+        self.assertEqual(self.get("/api/approval", token=self.server.ui_token)[1]["sessions"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,14 @@
+{
+  "_comment": "OPT-IN example only. Do NOT copy into .claude/settings.json (that is the dev-session state hook). Enable the allow/deny gate with:  BUTTONLAB_URL=http://127.0.0.1:8765 BUTTONLAB_HOOK_TOKEN=<hook token from server startup> BUTTONLAB_BRIDGE_ID=<any id>  claude --settings hooks/hook-gate.settings.example.json .  The three BUTTONLAB_* values are read from the environment by hook_bridge.py so no secret is stored in this file. Status: code-integrated + unit-tested; submission-build E2E re-verification is a human step. The PTY key path (/api/press) is the sole E2E-verified submission path.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/hooks/hook_bridge.py\"" } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/hooks/hook_bridge.py\"", "timeout": 90 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/hooks/hook_bridge.py\"" } ] }
+    ]
+  }
+}

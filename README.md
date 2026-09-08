@@ -30,11 +30,15 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기면서, 실행 직전
 Node Bridge 경로(버튼→WebSocket→브리지→PTY)는 버튼↔브리지 왕복까지 실기기 확인**했고,
 **브리지↔Python 어댑터 통합이 남은 단계**입니다(아래 [실물 UNO R4 WiFi 연결](#실물-uno-r4-wifi-연결-제출-기준)).
 
-**[통합 예정] `hook_bridge.py`의 PreToolUse allow/deny 게이트** — 지정 도구 실행을 버튼 승인까지
-정지시키고 `allow`/`deny`를 반환합니다. **팀 실기기 E2E에서 버튼→브리지→Python PTY→실제 Claude Code
-실행 경로로 승인 시 실행 / 거절 시 해당 요청 미실행을 확인**했으며, 이 게이트는 **별도 저장소에 있어
-제출 저장소로의 통합이 남은 단계**입니다. 현재 제출 저장소의 `hooks/claude_state_hook.py`는 권한을
-결정하지 않는 상태 신호입니다([Claude 상태 읽기](#claude-상태-읽기-주의) 참고).
+**`hook_bridge.py`의 PreToolUse allow/deny 게이트 — 코드 통합·단위검증 완료(제출버전 E2E 재검증은
+사람 몫).** 지정 도구 실행을 버튼 승인까지 정지시키고 `allow`/`deny`를 반환하는 승인 브로커(`server.py`의
+`/api/approval*` 엔드포인트 + `hooks/hook_bridge.py`)를 이 저장소에 **코드로 통합하고 단위테스트
+(`tests/test_approval.py`, 12개)로 검증**했습니다. 팀 실기기 PoC에서 버튼→브리지→Python→실제 Claude
+실행 게이트가 E2E로 확인됐지만, **제출버전의 E2E 재검증(예시 settings로 게이트를 켜고 실기기 버튼이 진짜
+도구 실행을 allow/deny 하는지)은 사람이 수행해야 하는 단계**입니다. 게이트는 프로젝트 기본 설정이 아니라
+**별도 예시 settings로 옵트인 활성화**합니다(아래 [승인 게이트 활성화](#승인-게이트-활성화-옵트인) 참고).
+**PTY 키응답 경로가 이 제출의 유일한 E2E 검증 경로**이며, 제출 저장소의 `hooks/claude_state_hook.py`는
+권한을 결정하지 않는 상태 신호입니다([Claude 상태 읽기](#claude-상태-읽기-주의) 참고).
 
 매크로패드·스트림덱은 보통 버튼에 단축키·명령을 매핑해 **실행을 촉발**하는 용도로 쓰입니다.
 HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결정**에 연결합니다 — 이 구조적 차이는
@@ -75,6 +79,26 @@ python3 server.py --port 8766
 `python3 server.py` → 브라우저에서 `http://127.0.0.1:8765` 열기 → **Claude 시작** → 요청 입력 →
 승인 프롬프트가 뜨면 **웹 시뮬레이션 또는 실물 버튼으로 ✓ 승인 / ✕ 거절** → 화면·OLED에서 결과 확인.
 하드웨어 연결·시뮬레이션 키·검증 절차는 아래 상세 섹션을 참고하세요.
+
+### 승인 게이트 활성화 (옵트인)
+
+allow/deny 게이트는 **기본 비활성**입니다 — 프로젝트 `.claude/settings.json`에는 등록하지 않습니다
+(브로커가 꺼져 있으면 개발용 세션의 모든 도구 호출이 대기하기 때문). 별도 예시 settings로만 옵트인
+활성화하며, **제출버전 실기기 E2E 재검증은 사람이 수행**합니다.
+
+```bash
+python3 server.py --show-gate-token     # 브로커 기동 + hook 토큰을 콘솔에 출력
+# 다른 터미널에서, Claude 세션을 게이트 settings로 실행:
+BUTTONLAB_URL=http://127.0.0.1:8765 \
+BUTTONLAB_HOOK_TOKEN=<위에서 출력된 hook 토큰> \
+BUTTONLAB_BRIDGE_ID=$(hostname) \
+claude --settings hooks/hook-gate.settings.example.json
+```
+
+`hook_bridge.py`는 도구 실행 직전 `/api/approval/wait`를 롱폴하고, 버튼(웹 UI 또는 실물 device 어댑터)이
+`/api/approval/resolve`로 `allow`/`deny`를 보낼 때까지 대기합니다. **브리지 응답이 없거나 오류면 `ask`로
+폴백**해 Claude 기본 권한 메뉴로 넘깁니다(자동 승인 없음). **토큰 3역할** — `ui`(조회+해결)·`device`
+(조회+해결)·`hook`(등록·대기만). hook 토큰은 **스스로 승인할 수 없어** 사람의 결정을 우회하지 못합니다.
 
 ## 사용한 AI 도구
 

@@ -11,20 +11,20 @@ and `hypothesis` (local `.venv/`, gitignored — PEP 668 base env).
 ```bash
 npm install && python3 -m venv .venv && ./.venv/bin/pip install hypothesis   # once
 npm test                                                                     # 12 JS tests
-./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 33 Python tests
+./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 45 Python tests
 python3 server.py                                                            # run app
 ```
 
-## Result (re-measured 2026-09-08)
+## Result (re-measured 2026-09-09)
 
 | Suite | Command | Result |
 |---|---|---|
-| Python unit + property | `unittest discover` (venv) | **33 passed** |
+| Python unit + property | `unittest discover` (venv) | **45 passed** (incl. 12 approval-gate broker tests in `tests/test_approval.py`) |
 | JS unit + property | `node --test tests/*.test.js` | **12 passed** |
-| **Total** | | **45 passed, 0 failed** |
+| **Total** | | **57 passed, 0 failed** |
 
 Syntax gates: `node --check` on `app.js`/`web-terminal.js`/`serial.js` and
-`py_compile` on `server.py`/`terminal.py`/`claude_state.py`/`hooks/claude_state_hook.py`
+`py_compile` on `server.py`/`terminal.py`/`claude_state.py`/`hooks/claude_state_hook.py`/`hooks/hook_bridge.py`
 all pass. `index.html` element IDs referenced by the JS were verified present;
 all Codex/UNO artifacts (`terminal-codex`, `terminal-yolo`, `button-target`,
 `codex-step`, `codexAvailable`, "UNO R4") removed.

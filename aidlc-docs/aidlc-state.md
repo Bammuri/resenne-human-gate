@@ -11,7 +11,7 @@
 - **Phase**: CONSTRUCTION
 - **Active Stage**: Build & Test — complete (auto-proceeding per user instruction "자동진행해"). Ready for OPERATIONS (placeholder) / final commit.
 - **Unit**: `claude-binddeck-retarget` (single unit)
-- **Verification (re-measured 2026-09-08)**: **45 tests pass** (33 Python via `.venv` unittest incl. Hypothesis PBT; 12 JS via `node --test` incl. fast-check PBT). Syntax gates (`node --check`, `py_compile`) pass. **Real-hardware (UNO R4 WiFi):** physical button → WebSocket → Node Bridge round-trip confirmed on device (2026-09-07~08); OLED + D3 REJECT confirmed via the team button-test sketch. Deferred: live-`claude` keystroke smoke + the Node Bridge↔PTY adapter end-to-end integration — see build-and-test docs and `HACKATHON_EXECUTION_PLAN.md` §2.
+- **Verification (re-measured 2026-09-09)**: **57 tests pass** (45 Python via `.venv` unittest incl. Hypothesis PBT + the 12 approval-gate broker unit tests in `tests/test_approval.py`; 12 JS via `node --test` incl. fast-check PBT). Syntax gates (`node --check`, `py_compile`) pass. **Real-hardware (UNO R4 WiFi):** physical button → WebSocket → Node Bridge round-trip confirmed on device (2026-09-07~08); OLED + D3 REJECT confirmed via the team button-test sketch. **allow/deny gate (unit `approval-gate`):** code-integrated + unit-tested in the submission repo (`server.py` `/api/approval*` + `hooks/hook_bridge.py`); submission-build E2E is a human step (opt-in via `hooks/hook-gate.settings.example.json`) — design in `construction/approval-gate/design.md`. Deferred: live-`claude` keystroke smoke + the Node Bridge↔PTY adapter end-to-end integration + submission-build gate E2E — see build-and-test docs and `HACKATHON_EXECUTION_PLAN.md` §2. The PTY key path remains the sole E2E-verified submission path.
 
 ## Extension Configuration
 | Extension | Enabled | Mode | Decided At | Notes |
@@ -47,5 +47,6 @@ All 10 requirement decisions were auto-confirmed via installed GPT (Codex CLI, m
 | CONSTRUCTION | Functional Design / NFR | ⏭️ Folded into Application Design |
 | CONSTRUCTION | Infrastructure Design | ⏭️ Skipped (no cloud/deploy) |
 | CONSTRUCTION | Code Generation | ✅ Completed |
-| CONSTRUCTION | Build & Test | ✅ Completed (45 tests pass; docs in construction/build-and-test/) |
+| CONSTRUCTION | Unit `approval-gate` (allow/deny gate) | ✅ Code-integrated + unit-tested (12 tests); submission-build E2E = human. Design in construction/approval-gate/design.md |
+| CONSTRUCTION | Build & Test | ✅ Completed (57 tests pass; docs in construction/build-and-test/) |
 | OPERATIONS | — | ⬜ Placeholder (out of scope) |

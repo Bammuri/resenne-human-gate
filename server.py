@@ -2,6 +2,7 @@
 """Local BindDeck button simulator that drives an app-owned Claude Code session."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -52,6 +53,28 @@ DEFAULT_CSP = (
     "frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 )
 
+# The PreToolUse hook long-polls this many seconds; the Claude-side hook timeout must be
+# a little longer so the socket outlives one server-side wait window.
+APPROVAL_WAIT_SECONDS = 80
+# Drop a session that has not been heard from in this long (no SessionEnd received).
+SESSION_TTL_SECONDS = 1800
+
+
+def summarize_tool(tool_name, tool_input):
+    """A short, human-readable description of what Claude wants to run."""
+    if not isinstance(tool_input, dict):
+        return str(tool_name or "tool")
+    if tool_name == "Bash":
+        return (tool_input.get("command") or "").strip()[:240] or "Bash"
+    for key in ("file_path", "path", "url", "pattern", "command", "notebook_path"):
+        value = tool_input.get(key)
+        if isinstance(value, str) and value:
+            return f"{key}: {value}"[:240]
+    try:
+        return json.dumps(tool_input, ensure_ascii=False)[:240]
+    except (TypeError, ValueError):
+        return str(tool_name or "tool")
+
 
 class SimulatorServer(ThreadingHTTPServer):
     daemon_threads = True
@@ -61,12 +84,120 @@ class SimulatorServer(ThreadingHTTPServer):
         self.claude = claude
         self.workspace = Path(workspace or Path.cwd()).resolve()
         self.state_file = Path(state_file) if state_file else (self.workspace / ".claude" / "binddeck-state.json")
-        self.token = secrets.token_urlsafe(32)
+        # Three token roles with different powers. The hook token can register and wait for
+        # a decision but MUST NOT resolve one: the Claude agent can read its own environment
+        # (via Bash), so a hook that could self-approve would defeat the whole gate.
+        self.ui_token = secrets.token_urlsafe(32)      # browser: poll pending + resolve
+        self.hook_token = secrets.token_urlsafe(32)    # Claude PreToolUse hook: register/wait only
+        self.device_token = secrets.token_urlsafe(32)  # physical adapter: query + resolve
+        self.token = self.ui_token  # backward-compatible alias for existing endpoints/tests
+        # Approval broker (allow/deny PreToolUse gate). Every mutation happens under this
+        # condition so resolve is an atomic compare-and-set and long-polls wake immediately.
+        self.approvals = {}       # approval_id -> record
+        self.sessions = {}        # (bridge_id, session_id) -> last_seen (monotonic)
+        self.approval_cv = threading.Condition()
         self.send_lock = threading.Lock()
         self.last_sent = 0.0
         self.replies = {}
         self.terminal = WebTerminal(claude, self.workspace)
         self.state = ClaudeStateReader(self.state_file, terminal=self.terminal)
+
+    # --- approval broker -------------------------------------------------
+
+    def _purge(self, now):
+        # Caller holds approval_cv.
+        for approval_id, record in list(self.approvals.items()):
+            if record["status"] == "pending" and now >= record["deadline"]:
+                record["status"] = "expired"
+        stale = [key for key, seen in self.sessions.items() if now - seen > SESSION_TTL_SECONDS]
+        for key in stale:
+            del self.sessions[key]
+
+    def create_approval(self, bridge_id, session_id, tool_use_id, tool_name, tool_input):
+        now = time.monotonic()
+        digest = hashlib.sha256(
+            json.dumps(tool_input, ensure_ascii=False, sort_keys=True, default=str).encode()
+        ).hexdigest()[:12]
+        with self.approval_cv:
+            self._purge(now)
+            # Deduplicate: one live request per (bridge, tool_use_id) so a re-fired hook
+            # attaches to the same record instead of creating a second pending item.
+            for approval_id, record in self.approvals.items():
+                if (record["status"] == "pending" and record["bridge_id"] == bridge_id
+                        and tool_use_id and record["tool_use_id"] == tool_use_id):
+                    return approval_id
+            approval_id = secrets.token_hex(8)
+            self.approvals[approval_id] = {
+                "id": approval_id,
+                "bridge_id": bridge_id,
+                "session_id": session_id,
+                "tool_use_id": tool_use_id,
+                "tool_name": tool_name,
+                "summary": summarize_tool(tool_name, tool_input),
+                "input_hash": digest,
+                "created_at": time.time(),
+                "deadline": now + APPROVAL_WAIT_SECONDS,
+                "status": "pending",
+            }
+            self.approval_cv.notify_all()
+            return approval_id
+
+    def wait_for_decision(self, approval_id):
+        """Block until the approval is resolved or its deadline passes. Returns allow/deny/ask."""
+        with self.approval_cv:
+            while True:
+                record = self.approvals.get(approval_id)
+                if record is None:
+                    return "ask"
+                if record["status"] in ("allow", "deny"):
+                    return record["status"]
+                remaining = record["deadline"] - time.monotonic()
+                if remaining <= 0 or record["status"] == "expired":
+                    record["status"] = "expired"
+                    return "ask"
+                self.approval_cv.wait(timeout=min(remaining, 5))
+
+    def resolve_approval(self, approval_id, decision):
+        """Atomic compare-and-set pending -> allow/deny. Returns the record or None on conflict."""
+        with self.approval_cv:
+            self._purge(time.monotonic())
+            record = self.approvals.get(approval_id)
+            if record is None or record["status"] != "pending":
+                return None
+            record["status"] = decision
+            self.approval_cv.notify_all()
+            return record
+
+    def list_pending(self):
+        with self.approval_cv:
+            self._purge(time.monotonic())
+            now = time.monotonic()
+            pending = [
+                {
+                    "id": r["id"],
+                    "tool_name": r["tool_name"],
+                    "summary": r["summary"],
+                    "session": (r["session_id"] or "")[:8],
+                    "ageMs": int((now - (r["deadline"] - APPROVAL_WAIT_SECONDS)) * 1000),
+                }
+                for r in self.approvals.values() if r["status"] == "pending"
+            ]
+            pending.sort(key=lambda item: item["ageMs"], reverse=True)
+            return {"pending": pending, "count": len(pending), "sessions": len(self.sessions)}
+
+    def register_session(self, bridge_id, session_id):
+        with self.approval_cv:
+            self.sessions[(bridge_id, session_id)] = time.monotonic()
+            self.approval_cv.notify_all()
+
+    def end_session(self, bridge_id, session_id):
+        with self.approval_cv:
+            self.sessions.pop((bridge_id, session_id), None)
+            for record in self.approvals.values():
+                if (record["status"] == "pending" and record["bridge_id"] == bridge_id
+                        and record["session_id"] == session_id):
+                    record["status"] = "expired"
+            self.approval_cv.notify_all()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -93,6 +224,10 @@ class Handler(BaseHTTPRequestHandler):
         port = self.server.server_port
         return self.headers.get("Host") in {f"127.0.0.1:{port}", f"localhost:{port}"}
 
+    def token_ok(self, *expected):
+        provided = self.headers.get("X-Simulator-Token", "")
+        return any(secrets.compare_digest(provided, token) for token in expected)
+
     def do_GET(self):
         if not self.valid_host():
             return self.respond(403, {"error": "로컬 주소로 접속해 주세요."})
@@ -104,6 +239,12 @@ class Handler(BaseHTTPRequestHandler):
                 "workspace": str(self.server.workspace),
                 "token": self.server.token,
             })
+        if path == "/api/approval":
+            # 대기목록 조회: 브라우저(ui 토큰) + 실물 device 어댑터(device 토큰) 허용.
+            # hook 토큰은 불가(자가승인 방지) — README의 device 역할("조회+해결")과 일치.
+            if not self.token_ok(self.server.ui_token, self.server.device_token):
+                return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
+            return self.respond(200, self.server.list_pending())
         if path in ("/api/state", "/api/terminal"):
             if not secrets.compare_digest(self.headers.get("X-Simulator-Token", ""), self.server.token):
                 return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
@@ -123,18 +264,10 @@ class Handler(BaseHTTPRequestHandler):
         filename, content_type = ASSETS[path]
         self.respond(200, (ROOT / filename).read_bytes(), content_type)
 
-    def do_POST(self):
-        if not self.valid_host():
-            return self.respond(403, {"error": "로컬 주소로 접속해 주세요."})
-        if self.path not in ("/api/press", "/api/terminal/start", "/api/terminal/input", "/api/terminal/resize", "/api/terminal/stop"):
-            return self.respond(404, {"error": "경로를 찾을 수 없습니다."})
-        expected_origin = f"http://{self.headers.get('Host')}"
-        if self.headers.get("Origin") not in (None, expected_origin):
-            return self.respond(403, {"error": "같은 페이지에서만 입력할 수 있습니다."})
-        if not secrets.compare_digest(self.headers.get("X-Simulator-Token", ""), self.server.token):
-            return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
+    def read_json(self):
         if self.headers.get_content_type() != "application/json":
-            return self.respond(415, {"error": "JSON 입력이 필요합니다."})
+            self.respond(415, {"error": "JSON 입력이 필요합니다."})
+            return None
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if not 0 < size <= 50000:
@@ -143,11 +276,85 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(size))
             if not isinstance(payload, dict):
                 raise ValueError
+            return payload
         except (ValueError, OSError):
-            return self.respond(400, {"error": "올바른 JSON 입력이 필요합니다."})
+            self.respond(400, {"error": "올바른 JSON 입력이 필요합니다."})
+            return None
+
+    def do_POST(self):
+        if not self.valid_host():
+            return self.respond(403, {"error": "로컬 주소로 접속해 주세요."})
+        routes = (
+            "/api/press", "/api/approval/wait", "/api/approval/resolve",
+            "/api/session/register", "/api/session/end",
+            "/api/terminal/start", "/api/terminal/input", "/api/terminal/resize", "/api/terminal/stop",
+        )
+        if self.path not in routes:
+            return self.respond(404, {"error": "경로를 찾을 수 없습니다."})
+        # The browser always sends a same-origin request; the device adapter and the Claude
+        # PreToolUse hook send no Origin at all. Reject only a *foreign* Origin.
+        expected_origin = f"http://{self.headers.get('Host')}"
+        if self.headers.get("Origin") not in (None, expected_origin):
+            return self.respond(403, {"error": "같은 페이지에서만 입력할 수 있습니다."})
+        payload = self.read_json()
+        if payload is None:
+            return
+        if self.path == "/api/approval/wait":
+            return self.handle_approval_wait(payload)
+        if self.path == "/api/approval/resolve":
+            return self.handle_approval_resolve(payload)
+        if self.path in ("/api/session/register", "/api/session/end"):
+            return self.handle_session_lifecycle(payload)
         if self.path.startswith("/api/terminal/"):
+            if not self.token_ok(self.server.ui_token):
+                return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
             return self.handle_terminal(payload)
+        if not self.token_ok(self.server.ui_token):
+            return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
         return self.handle_press(payload)
+
+    # --- approval endpoints (allow/deny PreToolUse gate) -----------------
+
+    def handle_approval_wait(self, payload):
+        if not self.token_ok(self.server.hook_token):
+            return self.respond(403, {"error": "hook token이 유효하지 않습니다."})
+        bridge_id = payload.get("bridge_id")
+        session_id = payload.get("session_id")
+        tool_use_id = payload.get("tool_use_id")
+        tool_name = payload.get("tool_name")
+        tool_input = payload.get("tool_input")
+        if not isinstance(bridge_id, str) or not isinstance(tool_name, str):
+            return self.respond(400, {"error": "bridge_id와 tool_name이 필요합니다."})
+        approval_id = self.server.create_approval(bridge_id, session_id or "", tool_use_id or "", tool_name, tool_input)
+        decision = self.server.wait_for_decision(approval_id)
+        return self.respond(200, {"approval_id": approval_id, "decision": decision})
+
+    def handle_approval_resolve(self, payload):
+        # A resolve may come from the browser (UI token) or the physical adapter (device token),
+        # never from the hook token.
+        if not self.token_ok(self.server.ui_token, self.server.device_token):
+            return self.respond(403, {"error": "승인 권한이 없는 토큰입니다."})
+        approval_id = payload.get("approval_id")
+        decision = payload.get("decision")
+        if decision not in ("allow", "deny") or not isinstance(approval_id, str) or not approval_id:
+            return self.respond(400, {"error": "approval_id와 allow/deny가 필요합니다."})
+        record = self.server.resolve_approval(approval_id, decision)
+        if record is None:
+            return self.respond(409, {"error": "이미 처리되었거나 만료된 승인입니다."})
+        return self.respond(200, {"ok": True, "decision": decision, "tool_name": record["tool_name"]})
+
+    def handle_session_lifecycle(self, payload):
+        if not self.token_ok(self.server.hook_token):
+            return self.respond(403, {"error": "hook token이 유효하지 않습니다."})
+        bridge_id = payload.get("bridge_id")
+        session_id = payload.get("session_id")
+        if not isinstance(bridge_id, str):
+            return self.respond(400, {"error": "bridge_id가 필요합니다."})
+        if self.path == "/api/session/register":
+            self.server.register_session(bridge_id, session_id or "")
+        else:
+            self.server.end_session(bridge_id, session_id or "")
+        return self.respond(200, {"ok": True})
 
     def handle_press(self, payload):
         try:
@@ -221,6 +428,9 @@ def main():
     parser.add_argument("--mock", action="store_true",
                         help="Run a scripted stand-in (demo/fake_claude.py) instead of the real Claude CLI — "
                              "lets the whole app run with no `claude` install and no hardware.")
+    parser.add_argument("--show-gate-token", action="store_true",
+                        help="Print the register/wait-only hook token at startup so the opt-in allow/deny "
+                             "gate (claude --settings hooks/hook-gate.settings.example.json) can reach the broker.")
     args = parser.parse_args()
     claude = [sys.executable, str(ROOT / "demo" / "fake_claude.py")] if args.mock else shutil.which("claude")
     server = SimulatorServer(("127.0.0.1", args.port), claude, args.cwd, args.state_file)
@@ -231,6 +441,11 @@ def main():
         print(f"Claude CLI: {'found' if server.claude else '(not found — install Claude Code, or use --mock)'}", flush=True)
     print(f"Workspace: {server.workspace}", flush=True)
     print(f"Hook state file: {server.state_file}", flush=True)
+    if args.show_gate_token:
+        # Opt-in: expose the register/wait-only hook token so `claude --settings
+        # hooks/hook-gate.settings.example.json` can reach the approval broker. This token
+        # cannot resolve an approval, so printing it locally does not enable self-approval.
+        print(f"Approval-gate hook token: {server.hook_token}", flush=True)
     def stop_server(signum, frame):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop_server)
