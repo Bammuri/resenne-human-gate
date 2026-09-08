@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Re:senne HUMAN GATE — 승인 패널</title>
+  <link rel="icon" href="favicon.svg" />
+  <!-- Styles are inline (allowed by style-src 'unsafe-inline'); the script is a same-origin
+       file (script-src 'self') — no inline JS, same strict CSP as the app and demo pages. -->
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      max-width: 44rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5;
+    }
+    h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+    .sub { color: #666; margin-top: 0; font-size: 0.9rem; }
+    .note {
+      border-left: 3px solid #c9a227; background: rgba(201,162,39,0.08);
+      padding: 0.6rem 0.8rem; border-radius: 0.3rem; font-size: 0.85rem; margin: 1rem 0;
+    }
+    #gate-status { min-height: 1.4rem; font-size: 0.9rem; color: #444; }
+    ul#gate-list { list-style: none; padding: 0; margin: 0.5rem 0; }
+    .gate-item {
+      display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.7rem;
+      border: 1px solid rgba(128,128,128,0.35); border-radius: 0.4rem; margin-bottom: 0.5rem;
+    }
+    .gate-desc { flex: 1; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85rem; word-break: break-all; }
+    .gate-item button { border: 0; border-radius: 0.35rem; padding: 0.4rem 0.7rem; font-size: 0.9rem; cursor: pointer; }
+    .gate-approve { background: #1f9d55; color: #fff; }
+    .gate-reject { background: #c53030; color: #fff; }
+    #gate-empty { color: #777; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Re:senne HUMAN GATE — 승인 패널</h1>
+  <p class="sub">Claude Code가 실행 전에 기다리는 도구 호출을 사람이 <strong>허용</strong>하거나 <strong>거부</strong>합니다.</p>
+
+  <p class="note">
+    이 패널은 대기 중인 요청에 <strong>허용/거부 결정을 브로커로 전송</strong>합니다(소프트웨어 경로 검증됨).
+    실제 <code>claude</code> 실행이 그 결정을 존중하는지는 실행 중인 Claude 세션에서 확인하는 라이브 단계이며,
+    완전 E2E 검증 경로는 PTY 키응답(<code>/api/press</code>)입니다.
+  </p>
+
+  <div id="gate-status">연결 중…</div>
+  <ul id="gate-list"></ul>
+  <p id="gate-empty" hidden>대기 중인 승인 요청이 없습니다.</p>
+
+  <script src="gate.js" defer></script>
+</body>
+</html>

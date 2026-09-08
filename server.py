@@ -31,6 +31,12 @@ ASSETS = {
     "/vendor/xterm.css": ("vendor/xterm.css", "text/css; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    # Standalone approval panel for the opt-in allow/deny gate. It reuses the ui token from
+    # /api/session and talks only to /api/approval + /api/approval/resolve; it does not touch
+    # the terminal/PTY page. Its <script> is a same-origin file so it loads under the same
+    # strict CSP as the app (no 'unsafe-inline' for scripts).
+    "/gate.html": ("gate.html", "text/html; charset=utf-8"),
+    "/gate.js": ("gate.js", "text/javascript; charset=utf-8"),
     "/firmware.ino": ("firmware/binddeck_claude/binddeck_claude.ino", "text/plain; charset=utf-8"),
     "/demo/fake-serial.js": ("demo/fake-serial.js", "text/javascript; charset=utf-8"),
     # The hardware-free explainer. Its <style>/<script> live in sibling files so the

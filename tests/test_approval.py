@@ -9,7 +9,9 @@ submission path.
 
 import http.client
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import threading
@@ -177,6 +179,89 @@ class ApprovalBrokerTests(unittest.TestCase):
         self.assertEqual(self.get("/api/approval", token=self.server.ui_token)[1]["sessions"], 1)
         self.assertEqual(self.post("/api/session/end", registration, token=self.server.hook_token)[0], 200)
         self.assertEqual(self.get("/api/approval", token=self.server.ui_token)[1]["sessions"], 0)
+
+    # --- hook_bridge.py process, end-to-end (software-only, no hardware) ------
+    #
+    # These drive the REAL hooks/hook_bridge.py binary exactly as Claude Code's
+    # PreToolUse hook would: a PreToolUse event on stdin, BUTTONLAB_* in the
+    # environment, and the permissionDecision contract expected back on stdout.
+    # A web resolver holding the ui token (the same token the browser already
+    # gets from /api/session) approves/denies over HTTP. This exercises the whole
+    # chain — hook process -> broker -> web resolver -> hook process -> stdout —
+    # without any hardware or browser. The only piece left for a live demo is
+    # Claude Code itself honouring the emitted decision (its documented contract).
+
+    HOOK_BRIDGE = Path(__file__).resolve().parents[1] / "hooks" / "hook_bridge.py"
+
+    def _run_hook_process(self, stdin_payload, env, timeout=30):
+        proc = subprocess.run(
+            [sys.executable, str(self.HOOK_BRIDGE)],
+            input=json.dumps(stdin_payload),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        self.assertEqual(proc.returncode, 0, f"hook exited nonzero; stderr={proc.stderr!r}")
+        return json.loads(proc.stdout)
+
+    def _gate_env(self, bridge_id):
+        env = dict(os.environ)
+        env["BUTTONLAB_URL"] = f"http://127.0.0.1:{self.server.server_port}"
+        env["BUTTONLAB_HOOK_TOKEN"] = self.server.hook_token
+        env["BUTTONLAB_BRIDGE_ID"] = bridge_id
+        return env
+
+    def _resolve_next_pending(self, decision, resolved, deadline_s=8):
+        """Poll /api/approval as the browser (ui token) would and resolve the
+        first pending request, recording the resolve HTTP status in `resolved`."""
+        deadline = time.monotonic() + deadline_s
+        while time.monotonic() < deadline:
+            pending = self.get("/api/approval", token=self.server.ui_token)[1]["pending"]
+            if pending:
+                approval_id = pending[0]["id"]
+                status, _ = self.post(
+                    "/api/approval/resolve",
+                    {"approval_id": approval_id, "decision": decision},
+                    token=self.server.ui_token,
+                )
+                resolved["status"] = status
+                return
+            time.sleep(0.02)
+
+    def test_hook_process_e2e_returns_web_allow(self):
+        resolved = {}
+        threading.Thread(target=self._resolve_next_pending, args=("allow", resolved), daemon=True).start()
+        out = self._run_hook_process(
+            {"hook_event_name": "PreToolUse", "session_id": "s-e2e", "tool_use_id": "tu-allow",
+             "tool_name": "Bash", "tool_input": {"command": "npm test"}},
+            self._gate_env("b-e2e-allow"),
+        )
+        self.assertEqual(resolved.get("status"), 200, "web resolver never approved")
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "PreToolUse")
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "allow")
+
+    def test_hook_process_e2e_returns_web_deny(self):
+        resolved = {}
+        threading.Thread(target=self._resolve_next_pending, args=("deny", resolved), daemon=True).start()
+        out = self._run_hook_process(
+            {"hook_event_name": "PreToolUse", "session_id": "s-e2e", "tool_use_id": "tu-deny",
+             "tool_name": "Bash", "tool_input": {"command": "rm -rf /tmp/scratch"}},
+            self._gate_env("b-e2e-deny"),
+        )
+        self.assertEqual(resolved.get("status"), 200, "web resolver never denied")
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_hook_process_without_broker_env_fails_safe_to_ask(self):
+        # No BUTTONLAB_* configured: the hook must never block or crash the tool;
+        # it fails safe by deferring to Claude Code's normal prompt ("ask").
+        env = {k: v for k, v in os.environ.items() if not k.startswith("BUTTONLAB_")}
+        out = self._run_hook_process(
+            {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "ls"}},
+            env,
+            timeout=10,
+        )
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "ask")
 
 
 if __name__ == "__main__":

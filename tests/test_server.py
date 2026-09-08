@@ -187,6 +187,29 @@ class BridgeTests(unittest.TestCase):
             for forbidden in ["fetch(", "XMLHttpRequest", "/api/", "http://", "https://"]:
                 self.assertNotIn(forbidden, text, f"{name} unexpectedly references {forbidden!r}")
 
+    def test_gate_panel_is_served_under_the_same_strict_csp(self):
+        from server import DEFAULT_CSP
+        # The opt-in approval panel is two sibling files served like any other asset.
+        for path in ["/gate.html", "/gate.js"]:
+            status, frame, body = self.get(path)
+            self.assertEqual(status, 200, path)
+            self.assertEqual(frame, "DENY")
+            self.assertTrue(body)
+        # Same strict CSP as the app; the panel's script is a same-origin file so script-src
+        # stays 'self' and is never widened to 'unsafe-inline'.
+        self.assertEqual(self.header("/gate.html", "Content-Security-Policy"), DEFAULT_CSP)
+        script_src = DEFAULT_CSP.split("script-src", 1)[1].split(";", 1)[0]
+        self.assertNotIn("'unsafe-inline'", script_src)
+        # Unlike the offline demo, the panel is a live client: it reuses the ui token and
+        # talks ONLY to the approval endpoints — never the PTY key path or the terminal.
+        gate_js = (Path(__file__).resolve().parents[1] / "gate.js").read_text(encoding="utf-8")
+        for required in ["/api/session", "/api/approval", "/api/approval/resolve"]:
+            self.assertIn(required, gate_js)
+        # No external URLs anywhere, and it must never *call* the PTY key path or the
+        # terminal (fetch targets are quoted literals; a prose mention in a comment is fine).
+        for forbidden in ["http://", "https://", '"/api/press"', '"/api/terminal']:
+            self.assertNotIn(forbidden, gate_js, f"gate.js unexpectedly references {forbidden!r}")
+
     def test_terminal_start_requires_token(self):
         with patch.object(self.server.terminal, "start") as start:
             conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)

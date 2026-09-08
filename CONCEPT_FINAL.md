@@ -50,7 +50,7 @@
 - 따라서 공개 문구 = **"물리 버튼으로 실제 Claude Code의 대기 중인 작업 실행을 승인한다."** (신호 전달까지만으로 낮출 이유 없음)
 - **필수 증거 1개 = 무편집 영상:** `승인 대기 → ✓ 누름 → 요청한 파일의 실제 변경`을 끊김 없이. 거절 주장까지 담으려면 같은 영상에 `새 요청 → ✕ → 해당 요청 취소·변경 미발생`.
 - **검증 주체 = "팀 실기기 E2E"로 명시.** AI(개발환경)의 재검증을 채택 조건으로 다시 걸지 않는다. 대신 **검증 담당자가 영상에 대응하는 제출 커밋·브리지·펌웨어·Claude 버전·실행법을 기록**한다.
-- **B-검증 PoC 소스 = `arduino-simulator/`(PreToolUse hook `hook_bridge.py` 게이트).** 이 allow/deny 게이트(승인 브로커 + `hook_bridge.py`)는 제출 repo에 **코드 통합·단위검증 완료**(`server.py`의 `/api/approval*` + `hooks/hook_bridge.py` + `tests/test_approval.py` 12개, 2026-09-09) — **제출버전 E2E는 미검증(사람 몫)**, 별도 예시 settings로 옵트인. 설계 = `aidlc-docs/construction/approval-gate/design.md`. → 아래 §7.
+- **B-검증 PoC 소스 = `arduino-simulator/`(PreToolUse hook `hook_bridge.py` 게이트).** 이 allow/deny 게이트(승인 브로커 + `hook_bridge.py`)는 제출 repo에 **코드 통합·단위검증·소프트웨어 E2E 완료**(`server.py`의 `/api/approval*` + `hooks/hook_bridge.py` + `tests/test_approval.py`의 브로커·서브프로세스 E2E 테스트 + 브라우저 승인 패널 `/gate.html`·`gate.js` + 실서버 curl 스모크, 2026-09-09) — 브라우저(ui 토큰)에서 **사람이 대기 중 도구 실행에 allow/deny를 제출할 수 있음**. **실행 중인 진짜 `claude`가 그 결정을 존중해 실제 실행을 allow/deny 하는 라이브 링크는 미검증(사람/라이브 데모 몫)**, 별도 예시 settings로 옵트인. 설계 = `aidlc-docs/construction/approval-gate/design.md`. → 아래 §7.
 
 ---
 
@@ -65,7 +65,7 @@
 ### 근거가 되는 두 실제 트랙 (베이퍼웨어 아님)
 | 트랙 | 위치 | 메커니즘 | 상태 |
 |---|---|---|---|
-| 범용/리센느 커스텀 | `arduino-simulator/` → 제출 repo `server.py`·`hooks/hook_bridge.py` | PreToolUse hook로 Claude 도구 실행을 버튼 승인까지 정지 | 제출 repo **코드 통합+단위검증(12)** · 제출버전 E2E 사람 몫 (데모 E2E 근거 = PTY 경로) |
+| 범용/리센느 커스텀 | 제출 repo `server.py`·`hooks/hook_bridge.py`·`gate.html`/`gate.js` | PreToolUse hook로 Claude 도구 실행을 정지 + 브라우저/버튼 승인 패널 | **코드 통합+단위검증+SW E2E**(subprocess·curl) · 라이브 `claude` 존중 = 사람 몫 (완전 E2E 근거 = PTY 경로) |
 | AI-DLC 방향 | `arduino-simulator-aidlc/` | PTY 키스트로크(ACTION_KEYS) | **적용 로드맵**(§3) |
 
 ---
@@ -122,7 +122,7 @@
 
 ## 7. 확정 후 남은 작업 (게이트됨 — 별도 지시로 착수)
 
-1. **B-검증 PoC 임포트:** ✅ allow/deny 게이트(승인 브로커 + `hooks/hook_bridge.py`)를 제출 repo로 **코드 통합·단위검증(`tests/test_approval.py` 12개) 완료**(2026-09-09, 옵트인 예시 settings, `terminal.py`·프로젝트 `.claude/settings.json` 불변) — **제출버전 E2E는 미검증(사람 몫)**. Node Bridge↔Python(PTY) 어댑터 실행법 통합은 여전히 남은 작업(§2). README/PLAN/컨셉 문서를 이 시제로 정합화 완료. 설계 = `aidlc-docs/construction/approval-gate/design.md`.
+1. **B-검증 PoC 임포트:** ✅ allow/deny 게이트(승인 브로커 + `hooks/hook_bridge.py`)를 제출 repo로 **코드 통합·단위검증·소프트웨어 E2E 완료**(2026-09-09, 옵트인 예시 settings, `terminal.py`·프로젝트 `.claude/settings.json` 불변). 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 테스트 3개 + 실서버 curl 스모크로 검증, **브라우저 승인 패널 `/gate.html`**(별도 페이지, PTY 데모 불변) 추가. **실행 중인 진짜 `claude`가 결정을 존중해 실제 실행을 allow/deny 하는 라이브 링크는 미검증(사람/라이브 데모 몫)**, PTY 키응답이 유일 완전 E2E 경로. Node Bridge↔Python(PTY) 어댑터 실행법 통합은 여전히 남은 작업(§2). README/PLAN/컨셉 문서를 이 시제로 정합화 완료. 설계 = `aidlc-docs/construction/approval-gate/design.md`.
 2. **라이선스 명시:** ✅ 루트 `LICENSE`(Apache-2.0) + `NOTICE` 추가(2026-09-08). **팀 최종 sign-off 대기.** 제3자 vendor 라이선스 동봉 확인, 미해결 라이선스 코드 배포 제외 원칙 유지.
 3. **재현·안전 확인:** 중복/지연/대기없음/연결끊김 + 거절=미실행 3회.
 4. **미디어:** 무편집 B 영상(오늘 밤 확보) + 히어로 컷 + 증거 스샷 2.
