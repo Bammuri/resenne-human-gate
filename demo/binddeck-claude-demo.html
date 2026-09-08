@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Button Lab 데모 · BindDeck × Claude (하드웨어 없이)</title>
+<!--
+  HARDWARE-FREE DEMO of the Button Lab BindDeck × Claude flow. Three sibling files
+  (this page + demo.css + demo.js, linked by relative path):
+    - Open by double-click (file://) — the browser loads the two siblings; no server,
+      no `claude` CLI, no physical device needed.
+    - Or reach it in the app at /demo/ — served under the same strict CSP as the app
+      (script from 'self', no inline), which is why the script lives in demo.js.
+
+  It faithfully simulates the real pipeline:
+      device serial line  ->  logical action  ->  Claude keystroke
+  The two lookup tables in demo.js are MIRRORS of the app's single sources of truth
+  (kept in sync by hand — this is a demo, not the product):
+    - BUTTON_ACTIONS / ENCODER_ACTIONS  mirror  serial.js  (BTN:/ENC: -> action)
+    - ACTION_KEYS                        mirror  terminal.py (action -> key bytes)
+  Nothing here talks to a real Claude session; the "terminal" is a scripted stub.
+-->
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand"><span class="brand-icon">⌘</span> button<span class="brand-light">lab</span>
+      <span class="demo-badge">DEMO · NO HARDWARE</span></div>
+    <div class="top-note">실제 <code>claude</code> 세션·BindDeck 보드 없이 흐름을 그대로 재현하는 브라우저 데모입니다. 서버도 필요 없어요.</div>
+  </header>
+
+  <section class="intro">
+    <div class="eyebrow">BINDDECK × CLAUDE CODE — SIMULATION</div>
+    <h1>버튼으로 <span>Claude의 승인 프롬프트</span>에 답하기</h1>
+    <p>왼쪽은 대본으로 재현한 Claude Code 세션입니다. Claude가 권한을 물으면 오른쪽 BindDeck의
+       버튼·엔코더(또는 키보드)로 답하세요. 각 입력은 <b>시리얼 라인 → 논리 액션 → 키 입력</b>으로
+       변환되어 아래 로그에 남고, OLED에는 실제와 동일하게 상태·마지막 응답이 표시됩니다.</p>
+  </section>
+
+  <div class="workspace">
+    <!-- ============ LEFT: fake Claude terminal ============ -->
+    <section class="card">
+      <div class="card-head">
+        <h2><span class="icon">›_</span> Claude Code <span style="font-weight:400;color:#94a08c">(재현 · 실제 세션 아님)</span></h2>
+        <span id="state-badge" class="badge idle">대기</span>
+      </div>
+      <div class="term-wrap">
+        <div class="terminal" id="terminal" aria-live="polite"></div>
+      </div>
+      <div class="term-actions">
+        <button id="btn-restart" class="primary">↻ 시나리오 다시 시작</button>
+        <button id="btn-autoplay">▶ 자동 재생</button>
+        <span class="spacer" id="step-label">준비됨</span>
+      </div>
+    </section>
+
+    <!-- ============ RIGHT: BindDeck device + serial ============ -->
+    <div class="col">
+      <section class="device" aria-label="BindDeck 가상 장치">
+        <div class="d-top"><span><i class="dot"></i> BINDDECK · ESP32</span><span>USB SERIAL · 115200</span></div>
+
+        <!-- OLED -->
+        <div class="oled" id="oled">
+          <div class="o-title"><span>BUTTON LAB</span><span id="oled-src">SIM</span></div>
+          <div class="o-row"><span class="k">state</span><span id="oled-state">idle</span></div>
+          <div class="o-row"><span class="k">last</span><span id="oled-last">—</span></div>
+          <div class="o-prompt" id="oled-prompt">Claude 시작을 기다리는 중…</div>
+        </div>
+
+        <!-- encoder -->
+        <div class="enc-row">
+          <div class="knob" id="knob" title="KY-040 엔코더 · 누르면 ENTER" role="button" tabindex="0" aria-label="엔코더 누름 (ENTER)">
+            <div class="tick" id="knob-tick"></div><span class="push">PUSH</span>
+          </div>
+          <div class="enc-btns">
+            <button data-line="ENC:CCW" data-enc="up">⟲ CCW · 위로</button>
+            <button data-line="ENC:CW" data-enc="down">⟳ CW · 아래로</button>
+          </div>
+          <div class="enc-label">ENC:CCW → ▲<br>ENC:CW → ▼<br>PUSH → BTN:8</div>
+        </div>
+
+        <!-- 8 macro keys -->
+        <div class="keys" id="keys">
+          <button class="key mapped k-yes"  data-line="BTN:0"><span class="n">BTN:0</span><span class="g">✓</span><span class="lab">YES</span></button>
+          <button class="key mapped k-no"   data-line="BTN:1"><span class="n">BTN:1</span><span class="g">✕</span><span class="lab">NO</span></button>
+          <button class="key mapped k-stop" data-line="BTN:2"><span class="n">BTN:2</span><span class="g">■</span><span class="lab">STOP</span></button>
+          <button class="key inert" disabled><span class="n">BTN:3</span><span class="g">·</span><span class="lab">—</span></button>
+          <button class="key inert" disabled><span class="n">BTN:4</span><span class="g">·</span><span class="lab">—</span></button>
+          <button class="key inert" disabled><span class="n">BTN:5</span><span class="g">·</span><span class="lab">—</span></button>
+          <button class="key inert" disabled><span class="n">BTN:6</span><span class="g">·</span><span class="lab">—</span></button>
+          <button class="key inert" disabled><span class="n">BTN:7</span><span class="g">·</span><span class="lab">—</span></button>
+        </div>
+
+        <div class="d-hint">
+          <b>핵심:</b> <b>YES</b>는 Enter(<code>\r</code>)라서 <b>현재 선택된 항목</b>을 확정합니다.
+          그래서 다른 항목을 고르려면 엔코더로 <b>▲/▼</b> 이동 후 눌러야 해요. <b>NO/STOP</b>은 Esc(<code>\x1b</code>)로 즉시 거절/중단합니다.
+        </div>
+      </section>
+
+      <section class="card serial">
+        <div class="s-meta"><span>VIRTUAL SERIAL MONITOR</span><span>UTF-8 / LF</span></div>
+        <div class="serial-log" id="serial-log" role="log" aria-live="polite"></div>
+        <div class="s-bottom"><span><b id="signal-count">0</b> signals</span><span>device → action → key</span></div>
+        <div class="feeder">
+          <input id="feeder-input" placeholder="원시 시리얼 라인 입력 (예: BTN:0, ENC:CW)" aria-label="원시 시리얼 라인">
+          <button id="feeder-send">전송</button>
+        </div>
+        <div class="keyboard-hint">키보드: <kbd>Y</kbd> YES · <kbd>N</kbd> NO · <kbd>↑</kbd><kbd>↓</kbd> 이동 · <kbd>Enter</kbd> 확정 · <kbd>Esc</kbd> 중단</div>
+      </section>
+    </div>
+  </div>
+
+  <section class="legend">
+    <h3>매핑 (실제 앱과 동일 · serial.js + terminal.py 미러)</h3>
+    <table>
+      <thead><tr><th>장치 입력</th><th>시리얼 라인</th><th>논리 액션</th><th>Claude 키</th><th>의미</th></tr></thead>
+      <tbody id="legend-body"></tbody>
+    </table>
+    <p>이 데모의 키 시퀀스는 <code>terminal.py::ACTION_KEYS</code>의 미러입니다. 실제 <code>claude</code> 버전에서 메뉴 키가 다르면
+       실기기 스모크 테스트 때 바이트만 조정하면 되고, 매핑 로직은 그대로입니다.</p>
+  </section>
+
+  <footer>BUTTON LAB / BindDeck × Claude — 하드웨어 없는 브라우저 데모. 실제 서버·CLI·보드 없이 동작하며 어떤 것도 자동 승인하지 않습니다(사람이 직접 누를 때만).</footer>
+</div>
+
+<script src="demo.js" defer></script>
+</body>
+</html>

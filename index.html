@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f3">
+  <title>Button Lab · BindDeck × Claude</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <script src="/vendor/xterm.js" defer></script>
+  <script src="/vendor/addon-fit.js" defer></script>
+  <!-- Dev/demo only: a fake Web Serial port. It self-guards on ?fakeserial=1 and no-ops
+       otherwise, so behavior is unchanged without the flag. Loaded before app.js (deferred
+       scripts run in order) so window.fakeBindDeckSerial is set when app.js reads it. -->
+  <script src="/demo/fake-serial.js" defer></script>
+  <script src="/serial.js" defer></script>
+  <script src="/web-terminal.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Button Lab 홈"><span class="brand-icon">⌘</span> button<span class="brand-light">lab</span><span class="beta">PLAYGROUND</span></a>
+      <span class="local-status"><i></i> Local workspace</span>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div><div class="eyebrow">HARDWARE IDEAS, WITHOUT THE HARDWARE</div><h1>당신의 답을, <span>버튼 하나로.</span></h1><p>보드가 없어도 괜찮아요. 버튼을 눌러 실행 중인 Claude Code 세션에 답해 보세요.</p><p class="intro-demo"><a href="/demo/" target="_blank" rel="noopener">버튼 → 시리얼 → Claude 흐름 미리보기 · 데모 열기 ↗</a></p></div>
+        <div class="board-tag"><span class="arduino-mark">⌨</span><div>BindDeck<span>ESP32 · Claude</span></div></div>
+      </section>
+
+      <div class="workspace">
+        <div class="main-column">
+        <section class="web-terminal-panel" id="web-terminal" aria-label="웹에서 실행하는 터미널">
+          <div class="output-heading"><div><h2><span class="terminal-icon">›_</span> 웹 터미널</h2><p>이 컴퓨터에서 쉘이나 Claude Code를 실행하고 직접 입력하세요.</p></div><span id="terminal-state" class="output-badge">중지됨</span></div>
+          <div class="terminal-actions"><button id="terminal-shell">쉘 시작</button><button id="terminal-claude" disabled>Claude 시작</button><button id="terminal-stop" disabled>종료</button><span id="terminal-link">Claude를 시작하면 버튼 응답이 연결됩니다</span></div>
+          <div id="terminal-screen" class="terminal-screen"></div>
+          <div class="terminal-bottom"><span id="terminal-workspace">작업 폴더 확인 중</span><span id="terminal-message" role="status">위의 시작 버튼을 눌러주세요</span></div>
+        </section>
+
+        </div>
+
+        <aside class="control-column">
+          <section class="control-card board-control-card">
+            <div class="card-heading"><h2 id="board-control-title">가상 보드 · 응답 컨트롤</h2></div>
+            <section class="circuit-panel" aria-label="BindDeck 버튼 입력 시뮬레이터">
+          <div class="panel-top"><div><span class="status-dot"></span><strong id="board-mode-title">가상 보드</strong><span class="small-tag" id="board-mode-tag">SIMULATOR</span></div><span class="mono">5V · DIGITAL I/O</span></div>
+          <div class="circuit-stage" id="circuit-stage">
+            <div class="stage-label"><span>01</span> BUTTON CIRCUIT</div>
+            <svg class="circuit" viewBox="0 0 760 560" aria-labelledby="circuit-title" role="group">
+              <title id="circuit-title">BindDeck의 BTN:0에 YES, BTN:1에 NO, 엔코더로 메뉴를 이동하는 가상 입력 보드</title>
+              <defs>
+                <linearGradient id="pcb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#148a88"/><stop offset="1" stop-color="#086765"/></linearGradient>
+                <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#8c969e"/><stop offset="0.45" stop-color="#e7ebed"/><stop offset="1" stop-color="#919da6"/></linearGradient>
+                <pattern id="pins" width="18" height="20" patternUnits="userSpaceOnUse"><rect x="5" y="5" width="7" height="9" rx="1" fill="#3a4146"/><rect x="7" y="7" width="3" height="5" fill="#b8a16a"/></pattern>
+                <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity="0.3"/></filter>
+              </defs>
+              <path d="M30 173 H141" class="usb-cable"/><path d="M30 173 H141" class="usb-highlight"/>
+              <g filter="url(#shadow)">
+                <path d="M166 72 H573 L601 99 V310 L578 333 H167 Q149 333 149 315 V90 Q149 72 166 72Z" fill="url(#pcb)" stroke="#46aaa1" stroke-width="2"/>
+                <g class="pcb-traces"><path d="M211 127H267V188H338M223 291H276V241H327M542 127V165H503M437 280H480V310M216 217H256V272M318 102V134H352"/><path d="M190 126V148H227M470 93V143H440M565 239H529V271"/></g>
+                <g fill="#172b2c" stroke="#91b9a3" stroke-width="5"><circle cx="169" cy="93" r="8"/><circle cx="579" cy="108" r="8"/><circle cx="171" cy="311" r="8"/><circle cx="579" cy="310" r="8"/></g>
+                <rect x="242" y="86" width="288" height="20" rx="3" fill="#141d22"/><rect x="242" y="86" width="288" height="20" fill="url(#pins)"/>
+                <rect x="246" y="299" width="126" height="20" rx="3" fill="#141d22"/><rect x="246" y="299" width="126" height="20" fill="url(#pins)"/>
+                <rect x="394" y="299" width="144" height="20" rx="3" fill="#141d22"/><rect x="394" y="299" width="144" height="20" fill="url(#pins)"/>
+                <g class="pin-labels"><text x="249" y="119">GND</text><text x="431" y="119">5</text><text x="451" y="119">4</text><text x="469" y="119" class="no-pin-label">3</text><text x="487" y="119" class="yes-pin-label">2</text><text x="505" y="119">1</text><text x="523" y="119">0</text><text x="246" y="290">POWER</text><text x="447" y="290">ANALOG IN</text></g>
+                <rect x="135" y="153" width="58" height="40" rx="6" fill="url(#metal)" stroke="#627680" stroke-width="2"/><rect x="133" y="161" width="10" height="24" rx="4" fill="#253138"/><path d="M176 158V188M184 158V188" stroke="#838d94"/>
+                <rect x="144" y="248" width="61" height="44" rx="4" fill="#19242b"/><rect x="140" y="256" width="16" height="28" rx="3" fill="#080f13"/><circle cx="148" cy="270" r="6" fill="#4d585b"/>
+                <rect x="206" y="145" width="24" height="22" rx="3" fill="#a7b5b2"/><circle cx="218" cy="156" r="7" fill="#c5cbc8"/><text x="205" y="139" class="board-small">RESET</text>
+                <g transform="translate(292 148)"><rect width="65" height="65" rx="3" fill="#152d31" stroke="#b0b9a2" stroke-width="3"/><path d="M-5 5V60M70 5V60M5 -5H60M5 70H60" stroke="#c2c6b4" stroke-width="5" stroke-dasharray="3 4"/><text x="32" y="28" text-anchor="middle" class="chip-text">RENESAS</text><text x="32" y="42" text-anchor="middle" class="chip-text">RA4M1</text></g>
+                <rect x="493" y="163" width="67" height="82" rx="3" fill="#c7ccca" stroke="#8eabaa"/><rect x="497" y="167" width="59" height="47" fill="#b2bebb"/><text x="526" y="186" text-anchor="middle" class="module-text">ESP32</text><text x="526" y="199" text-anchor="middle" class="module-text">USB SERIAL</text><path d="M501 238V220H510V237H519V220H528V237H538V220H549" fill="none" stroke="#667c73" stroke-width="2"/>
+                <rect x="379" y="153" width="94" height="68" rx="4" fill="#173330"/><g id="led-matrix"></g>
+                <text x="381" y="241" class="board-title">BindDeck</text><text x="383" y="257" class="board-subtitle">ESP32</text><text x="249" y="257" class="infinity">⌨</text>
+                <circle cx="217" cy="200" r="4" fill="#b8f07a" class="power-led"/><text x="207" y="216" class="board-small">ON</text>
+                <circle id="tx-led" cx="238" cy="200" r="3" fill="#546d47"/><text x="232" y="216" class="board-small">TX</text>
+                <g fill="#c6c7a4"><rect x="212" y="234" width="10" height="16" rx="2"/><rect x="230" y="234" width="10" height="16" rx="2"/><rect x="361" y="245" width="7" height="15" rx="1"/></g>
+              </g>
+              <path id="yes-wire" d="M489 96V49Q489 35 507 35H635Q650 35 650 52V369Q650 384 634 384H283Q267 384 267 403V425" class="wire wire-yes"/>
+              <path id="no-wire" d="M471 96V24Q471 11 485 11H661Q676 11 676 27V391Q676 407 660 407H501Q485 407 485 425" class="wire wire-no"/>
+              <path d="M254 96V53H112V513H503V484M267 484V513" class="wire wire-ground"/>
+              <g class="pin-ends"><circle cx="489" cy="96" r="4" fill="#7bdfb4"/><circle cx="471" cy="96" r="4" fill="#eea39a"/><circle cx="254" cy="96" r="4" fill="#77838a"/></g>
+              <g id="board-yes" class="board-button" role="button" tabindex="-1" aria-disabled="true" aria-label="YES 버튼 누르기" data-choice="yes">
+                <rect x="226" y="423" width="82" height="68" rx="9" fill="#263439" stroke="#526367"/><path d="M237 426V416M297 426V416M237 489V499M297 489V499" stroke="#a4adab" stroke-width="5"/><circle cx="267" cy="456" r="25" fill="#122a23" stroke="#376851" stroke-width="2"/><circle class="button-cap" cx="267" cy="453" r="20" fill="#77dbaf"/><text x="267" y="458" text-anchor="middle" class="button-symbol">✓</text><text x="267" y="545" text-anchor="middle" class="circuit-caption">BTN:0 · YES</text>
+              </g>
+              <g id="board-no" class="board-button" role="button" tabindex="-1" aria-disabled="true" aria-label="NO 버튼 누르기" data-choice="no">
+                <rect x="444" y="423" width="82" height="68" rx="9" fill="#263439" stroke="#526367"/><path d="M455 426V416M515 426V416M455 489V499M515 489V499" stroke="#a4adab" stroke-width="5"/><circle cx="485" cy="456" r="25" fill="#332320" stroke="#855a54" stroke-width="2"/><circle class="button-cap" cx="485" cy="453" r="20" fill="#eaa198"/><text x="485" y="459" text-anchor="middle" class="button-symbol">×</text><text x="485" y="545" text-anchor="middle" class="circuit-caption">BTN:1 · NO</text>
+              </g>
+              <text x="122" y="537" class="ground-caption">GND</text>
+            </svg>
+            <div class="stage-footer"><span><i class="tiny-dot"></i> INPUT_PULLUP</span><span id="stage-hint">Claude 세션을 시작한 뒤 버튼을 사용할 수 있어요</span></div>
+          </div>
+          <div class="signal-path"><span class="path-step active"><b>1</b> 버튼 입력</span><span class="path-line"></span><span class="path-step" id="serial-step"><b>2</b> 시리얼 신호</span><span class="path-line"></span><span class="path-step" id="claude-step"><b>3</b> Claude 응답</span></div>
+        </section>
+            <div class="control-label">버튼 입력원</div>
+            <div class="source-tabs" role="group" aria-label="보드 모드"><button id="source-web" class="selected" aria-pressed="true">웹 시뮬레이션</button><button id="source-hardware" aria-pressed="false">실물 BindDeck · USB</button></div>
+            <div class="hardware-box" id="hardware-box" hidden><p id="hardware-status" role="status">binddeck_claude 펌웨어를 업로드한 뒤 USB 보드를 연결해 주세요.</p><button id="hardware-connect">USB BindDeck 연결</button><a href="#hardware-guide">배선·업로드 안내 ↓</a></div>
+            <p class="connection-description">버튼 입력은 실행 중인 Claude 세션의 승인 프롬프트에 바로 전송됩니다.</p>
+            <div class="answer-buttons"><button class="answer yes" data-choice="yes" disabled><span class="answer-symbol">✓</span><strong>YES</strong><span class="answer-meaning">승인 · Enter</span><kbd>Y</kbd></button><button class="answer no" data-choice="no" disabled><span class="answer-symbol">×</span><strong>NO</strong><span class="answer-meaning">거절 · Esc</span><kbd>N</kbd></button></div>
+            <div class="answer-buttons"><button class="answer nav" data-choice="nav_up" disabled><span class="answer-symbol">▲</span><strong>UP</strong><span class="answer-meaning">메뉴 위</span><kbd>↑</kbd></button><button class="answer nav" data-choice="nav_down" disabled><span class="answer-symbol">▼</span><strong>DOWN</strong><span class="answer-meaning">메뉴 아래</span><kbd>↓</kbd></button></div>
+            <div class="answer-buttons"><button class="answer confirm" data-choice="confirm" disabled><span class="answer-symbol">↵</span><strong>ENTER</strong><span class="answer-meaning">선택 확정</span><kbd>⏎</kbd></button><button class="answer stop" data-choice="stop" disabled><span class="answer-symbol">■</span><strong>STOP</strong><span class="answer-meaning">중단 · Esc</span><kbd>Esc</kbd></button></div>
+            <div class="response-status" id="response-status" role="status" aria-live="polite"><span class="waiting-dot"></span><span id="response-text">Claude 연결을 확인하고 있어요</span></div>
+            <div class="session-row"><span id="session-label">대화 연결 확인 중</span><code id="session-id">···</code></div>
+            <div class="session-row"><span>Claude 상태</span><code id="claude-state">···</code></div>
+          </section>
+
+          <section class="monitor-card">
+            <div class="card-heading"><h2><span class="terminal-icon">›_</span> 시리얼 모니터</h2><button class="text-button" id="clear-log">지우기</button></div>
+            <div class="monitor-meta"><span><i class="tiny-dot"></i> <span id="serial-source">VIRTUAL SERIAL</span></span><span>115200 baud</span></div>
+            <div class="serial-log" id="serial-log" role="log" aria-label="시리얼 전송 기록" aria-live="polite"></div>
+            <div class="monitor-bottom"><span><b id="event-count">0</b> signals sent</span><span>UTF-8 / LF</span></div>
+          </section>
+        </aside>
+      </div>
+
+      <section class="hardware-guide" id="hardware-guide"><div class="guide-heading"><div><h2>실물 BindDeck 연결하기</h2><p>BindDeck(ESP32) 매크로패드와 USB 데이터 케이블을 준비하세요.</p></div><a href="/firmware.ino" download="binddeck_claude.ino" class="download-link">펌웨어 코드 <span>↓</span></a></div><ol><li><strong>펌웨어 업로드</strong><span>Arduino IDE에 ESP32 보드 패키지와 Adafruit SSD1306 · Adafruit GFX · Bounce2 라이브러리를 설치하세요. ESP32 보드와 USB 포트를 선택하고 다운로드한 <code>binddeck_claude.ino</code>를 업로드합니다. 이 펌웨어는 BLE·Wi-Fi를 사용하지 않으며 자격 증명을 담지 않습니다.</span></li><li><strong>Claude 세션 시작</strong><span>웹 터미널에서 <b>Claude 시작</b>을 누르거나 터미널에 <code>claude</code>를 실행하세요. 승인 프롬프트가 뜨면 버튼으로 답할 수 있습니다.</span></li><li><strong>브라우저에서 연결</strong><span>다른 시리얼 모니터를 닫고, 데스크톱 Chrome에서 이 페이지를 여세요. <b>실물 BindDeck · USB → USB BindDeck 연결</b>을 누른 뒤 보드 포트를 선택합니다.</span></li><li><strong>버튼으로 응답</strong><span>BTN:0=YES(Enter), BTN:1=NO(Esc), BTN:2=STOP, 엔코더 회전=메뉴 이동, 엔코더 누름=ENTER 로 매핑됩니다. OLED에는 Claude 상태와 마지막 응답이 표시됩니다. 재업로드 전에는 USB 연결을 해제하세요.</span></li></ol><p class="guide-note">실물 모드는 USB 시리얼만 사용합니다. Wi-Fi·BLE 설정은 필요하지 않습니다. 버튼 입력은 사람이 직접 누를 때만 Claude로 전송되며, 자동 승인은 하지 않습니다.</p></section>
+      <footer><span>BUTTON LAB <i>/</i> BindDeck × Claude</span><span>버튼·시리얼 동작 시뮬레이션 · Claude 세션 상태는 로컬에서만 표시됩니다.</span></footer>
+    </main>
+  </div>
+</body>
+</html>

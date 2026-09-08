@@ -1,0 +1,12 @@
+{
+  "name": "button-lab-binddeck-claude",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local BindDeck button simulator that bridges hardware/virtual buttons to an app-owned Claude Code session. Runtime is zero-dependency; fast-check is a test-only dev dependency.",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "fast-check": "^3.23.2"
+  }
+}

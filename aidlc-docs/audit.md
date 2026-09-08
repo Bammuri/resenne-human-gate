@@ -1,0 +1,117 @@
+# AI-DLC Audit Log
+
+> Append-only. Raw user inputs are recorded verbatim with ISO 8601 timestamps. Never overwrite prior entries.
+
+---
+
+## 2026-09-08T02:23:18Z — Session inputs leading to AI-DLC launch
+
+The following raw user inputs were received (in order) during the session that led to launching the AI-DLC workflow for this brownfield retargeting task. Timestamps for the earlier inputs are approximated to the session date; the workflow was formally launched at the timestamp above.
+
+**[User input, raw]:**
+> \\wsl.localhost\Ubuntu\home\hj\aidlc-workshop\hackerthon\arduino-simulator 이 파일 분석해서 claude target으로 tuning해보자 처음 git init도 해줘 https://github.com/puritysb/AgentDeck?utm_source=chatgpt.com 그리고 이것도 이 프로젝트에서 도움이 될수 있는지 판단해보자 모든 정보를 수집한후에 gpt arsta mid에게 물어봐서 최종 판단을 내리도록해줘
+
+**[User answer to clarifying question — AskUserQuestion]:**
+> "gpt arsta mid" = Installed GPT (Codex CLI); Goal = Retarget bridge to Claude Code
+
+**[User input, raw]:**
+> 그러자 gitignore
+
+**[User input, raw]:**
+> 일단 commit하고 다른 worktree만들어서 AI-DLC 방법론을 이용해서 진행할꺼야 \\wsl.localhost\Ubuntu\home\hj\aidlc-workshop\table-order 여기서 claude.md랑 .aidlc-rule-details  aidlc-docs 등 필요한걸 가져와보자
+
+**[User input, raw]:**
+> AI_DLC 라는게 뭐야? 설명해줘
+
+**[User input, raw]:**
+> 진행하자
+
+---
+
+## 2026-09-08T02:23:18Z — Workspace Detection
+
+- **Action**: Executed Workspace Detection.
+- **Result**: Project Type = **Brownfield**. Detected existing Button Lab application (Python 3 stdlib HTTP server + vanilla JS/xterm.js frontend + Arduino firmware + tests). No pre-existing reverse-engineering artifacts.
+- **Decision**: Proceed to Reverse Engineering (no user approval required for Workspace Detection — informational).
+
+---
+
+## Reverse Engineering
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "(none — auto-proceeded from Workspace Detection per workflow)"
+**AI Response**: "Analyzed 22 first-party files. Generated 9 reverse-engineering artifacts + timestamp under aidlc-docs/inception/reverse-engineering/ (business-overview, architecture, code-structure, api-documentation, component-inventory, interaction-diagrams, technology-stack, dependencies, code-quality-assessment). Key finding: the Codex→Claude answer path is partially scaffolded (send_choice/claude_ready/start(kind='claude')), but state-reading (output.py), session discovery (detect_thread lock-file), and the UI are Codex-only; no `claude queue` equivalent exists, so the app-owned PTY is the robust send path. Presented REVIEW REQUIRED gate."
+**Context**: INCEPTION → Reverse Engineering complete. Awaiting explicit user approval before Requirements Analysis.
+
+---
+
+## Reverse Engineering — Review Gate (interaction)
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "한글로 알려줘"
+**AI Response**: "Re-presented the Reverse Engineering completion summary and REVIEW REQUIRED / WHAT'S NEXT approval gate in Korean, as requested. Still awaiting explicit approval (Request Changes / Approve & Continue) before Requirements Analysis. Artifacts remain in English under aidlc-docs/inception/reverse-engineering/."
+**Context**: INCEPTION → Reverse Engineering review gate. Language of chat responses switched to Korean per user request.
+
+---
+
+## Reverse Engineering — Review Gate (new HW constraint)
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "HW는 https://github.com/SanX18/BindDeck 이거쓸꺼야 분석해서 다시 만들어보자"
+**AI Response**: "New hardware-surface constraint received: replace the current UNO R4 WiFi YES/NO firmware + Web Serial board with the BindDeck project (https://github.com/SanX18/BindDeck) as the hardware. Cloning/analyzing the BindDeck repository to (1) understand its hardware, firmware, transport, and protocol, and (2) determine how it changes the reverse-engineering understanding and the retarget design. This is treated as an additional input at the RE review gate; RE approval still pending."
+**Context**: INCEPTION → Reverse Engineering review gate. New requirement: hardware = BindDeck (external reference/dependency).
+
+---
+
+## Reverse Engineering — BindDeck analysis result
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "(continuation of the BindDeck HW request)"
+**AI Response**: "Cloned and analyzed SanX18/BindDeck. Findings: ESP32-WROOM-32 macro pad (SSD1306 OLED, KY-040 encoder, 8 switches), communicates over USB serial 115200 + BLE HID + Wi-Fi UDP. Serial protocol — Device→PC: BTN:0..8, ENC:<VUP/VDN/...>, WIFI_INFO:; PC→Device: CFG:*, CMD:GET_WIFI/PREVIEW/SIMULATE/MSG/UPDATE, telemetry C:,U:,G:,V:. No HELLO/READY handshake (use CMD:GET_WIFI→WIFI_INFO:). Documented as aidlc-docs/inception/reverse-engineering/external-binddeck-reference.md, including mapping to Button Lab YES/NO (BTN:0→yes, BTN:1→no; encoder to navigate Claude's numbered permission menu; OLED as agent-state feedback), differences vs current UNO R4 firmware, and risks (hardcoded Wi-Fi creds, no LICENSE file, Windows-companion features to strip). Recommended: adapt serial.js to BindDeck framing, keep app-owned PTY send path, fork a slimmed firmware. Advancing to Requirements Analysis to capture the HW pivot and open decisions."
+**Context**: INCEPTION → Reverse Engineering. BindDeck analysis complete and documented. Transitioning to Requirements Analysis.
+
+---
+
+## Requirements Analysis — Clarifying Questions Issued
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "(none — auto-proceeded into Requirements Analysis after RE + BindDeck analysis)"
+**AI Response**: "Loaded requirements-analysis.md rules and the 3 extension opt-in files (security-baseline, resiliency-baseline, property-based-testing). Intent analysis: Migration+Enhancement, Multiple-Components, Moderate~Complex. Created aidlc-docs/inception/requirements/requirement-verification-questions.md with 10 questions (Korean): Q1 rebuild scope (firmware fork + host adapt / host-only / full rewrite); Q2 button→action mapping (YES/NO/ALWAYS/STOP/custom); Q3 encoder for Claude numbered-permission-menu navigation; Q4 OLED as Claude-state feedback; Q5 BLE/Wi-Fi handling + hardcoded-credential removal; Q6 Claude state-reading (hooks + .jsonl fallback / jsonl-only / none); Q7 host transport (Web Serial / Python serial / Wi-Fi UDP); Q8 security extension opt-in; Q9 resiliency extension opt-in; Q10 property-based-testing extension opt-in. Presented ⛔ gate — awaiting answers before generating requirements.md."
+**Context**: INCEPTION → Requirements Analysis, Step 6 gate. Awaiting user answers in the question file.
+
+---
+
+## Requirements Analysis — Answers Auto-Confirmed via GPT + Requirements Generated
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "한번에 하자 에매한건 정리해서 GPT arsta mid에게 물어보고 자동진행해"
+**AI Response**: "Per user instruction, did NOT wait at the questions gate. Consulted installed GPT (Codex CLI `codex exec`, medium reasoning, read-only sandbox) with all 10 decisions; GPT judgment saved verbatim to inception/requirements/gpt-astra-consultation.md. Auto-confirmed answers (filled into requirement-verification-questions.md): Q1=A, Q2=A+C, Q3=A, Q4=A, Q5=A, Q6=A, Q7=A, Q8=B, Q9=A, Q10=B. Recorded Extension Configuration in aidlc-state.md: Security=OFF (Q8=B), Resiliency=ON scoped-subset (Q9=A; cloud/DR/CI-CD/incident rules N/A for localhost single-process PoC; enforced RESILIENCY-05/06/10), PBT=ON partial (Q10=B; PBT-02/03/07/08/09 for pure mapping + serialization round-trips; fast-check for JS, Hypothesis for Python). Loaded full rules for the two opted-in extensions. Generated inception/requirements/requirements.md (FR-1..FR-7, NFR-1..NFR-6, scenarios S-1..S-6, extension-compliance scope, out-of-scope). User also said commit once at the end ('한번에 하자'). Auto-proceeding to Workflow Planning per '자동진행해' — not stopping at the requirements approval gate."
+**Context**: INCEPTION → Requirements Analysis complete. Auto-proceed authorized by user; advancing to Workflow Planning without a manual approval stop.
+
+---
+
+## Workflow Planning — Execution Plan Generated (auto-proceed)
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "(none — auto-proceeded per '자동진행해')"
+**AI Response**: "Generated inception/plans/execution-plan.md. Risk = Medium. Decisions: EXECUTE Application Design, Code Generation, Build & Test; SKIP User Stories (single-dev localhost tool, scenarios cover UX) and Units Generation (one cohesive unit `claude-binddeck-retarget`) and Infrastructure Design (no cloud/deploy); FOLD Functional Design + NFR Requirements + NFR Design into Application Design. Mermaid workflow viz validated. Package change sequence: host → frontend → firmware → hooks → tests. Auto-proceeding to Application Design without a manual approval stop."
+**Context**: INCEPTION → Workflow Planning complete. Auto-proceed.
+
+---
+
+## Application Design — Generated (auto-proceed, GPT-consulted)
+**Timestamp**: 2026-09-08T02:23:18Z
+**User Input**: "(none — auto-proceeded per '자동진행해')"
+**AI Response**: "Reconciled prior summary vs actual committed code: terminal.py/server.py/output.py are PURE Codex (no partial Claude scaffolding) — building the retarget from a Codex-only baseline. Received background research agent (a7d060cf46ba643ae) findings on Claude hooks (Notification=permission_prompt/Stop lifecycle), transcript schema (unstable → fallback only), and prompt UX (arrow-key menu; numbers/y-n unreliable → arrows+Enter, Esc=decline). Consulted GPT arsta mid on 3 ambiguous decisions (saved to application-design/application-design-consultation.md): Q1=A (fast-check+Hypothesis as test-only dev deps; runtime stays zero-dep), Q2=C (table-driven ACTION_KEYS, default YES=Enter/NO=Esc, correctable post-smoke-test), Q3=A (hooks-primary state file + jsonl fallback). Wrote inception/application-design/application-design.md folding Functional Design + NFR Requirements + NFR Design: component architecture, removed/replaced Codex artifacts table, two-layer pure mapping (device-line→action, action→PTY keys), component/method signatures (claude_state.py new, terminal.py/server.py major, serial.js major, firmware fork, hooks + .claude/settings.json), HTTP contract (/api/state replaces /api/output, claudeAvailable replaces codexAvailable), state model, S-1 sequence diagram, resiliency subset design (RESILIENCY-05/06/10), PBT plan (PBT-02/03/07/08/09). Auto-proceeding to Code Generation."
+**Context**: INCEPTION → Application Design complete. Auto-proceed to CONSTRUCTION / Code Generation.
+
+---
+
+## Code Generation — Package Changes Generated (auto-proceed)
+**Timestamp**: 2026-09-08T03:27:24Z
+**User Input**: "(none — auto-proceeded per '자동진행해'; single governing instruction '한번에 하자 에매한건 정리해서 GPT arsta mid에게 물어보고 자동진행해')"
+**AI Response**: "Executed the execution-plan.md package change sequence (host → frontend → firmware → hooks → tests) for unit claude-binddeck-retarget. HOST: rewrote terminal.py (removed output.py import + Codex thread/probe logic; added table-driven ACTION_KEYS single-source-of-truth, shell/claude allow-list, claude_ready(), send_choice()); created claude_state.py (ClaudeStateReader: hook-state-file primary + transcript-mtime fallback, never parses records, never raises) replacing deleted output.py (git rm); rewrote server.py (/api/state replaces /api/output, claudeAvailable replaces codexAvailable, handle_press validates 6 actions + idempotency/throttle/send-lock/503-no-session/502-on-failure, retained all localhost guards, --state-file arg, shutil.which('claude')). FRONTEND: rewrote serial.js (pure parseDeviceLine BTN:/ENC:→action, sendMessage CMD:MSG: OLED, BindDeck handshake), web-terminal.js (single Claude PTY, dropped codex/yolo + /api/output readiness), app.js (claudeAvailable gating, 6-action press(), /api/state poll → OLED, removed target selector), index.html (Claude/BindDeck wording, Start-Claude button, STOP + encoder controls, removed button-target/codex-step/yolo, firmware download binddeck_claude.ino). FIRMWARE: firmware/binddeck_claude/binddeck_claude.ino (ESP32 fork; BTN:/ENC: emit, BUTTON_LAB handshake, CMD:MSG: OLED; NO BLE/Wi-Fi/credentials; provenance/NO-LICENSE note per NFR-6). HOOKS: hooks/claude_state_hook.py (event→status state-file writer, atomic, never writes stdout, always exit 0 — no auto-answer) + .claude/settings.json registration. Added package.json (fast-check devDep), .gitignore entries (node_modules/, .venv/, state files, .hypothesis/). Auto-proceeding to Build & Test."
+**Context**: CONSTRUCTION → Code Generation complete. Auto-proceed.
+
+---
+
+## Build & Test — Suites Generated, Run Green (auto-proceed)
+**Timestamp**: 2026-09-08T03:27:24Z
+**User Input**: "(none — auto-proceeded per '자동진행해')"
+**AI Response**: "Installed test-only deps (npm fast-check; hypothesis into local .venv because base env is PEP 668 externally-managed). Deleted tests/test_output.py (output.py removed). Rewrote tests/test_terminal.py (shell/claude allow-list, claude_ready via cat stand-in, send_choice maps every action, table consistency), tests/test_server.py (6 actions, idempotency, 409 send-lock/reused-id, 429 throttle, 503 no-session, 502 failure, origin/host/token guards, /api/state + /api/session + static, cursor validation), tests/serial.test.js (BindDeck framing, handshake-gated input, OLED sendMessage). Added tests/test_claude_state.py (hook primary + transcript mtime fallback + offline degrade), and PBT suites tests/mapping.pbt.test.js (fast-check: PBT-02/03/07) + tests/test_mapping_pbt.py (Hypothesis: PBT-08/09). Fixed one test-expectation bug (overflow-record drop). RESULT: 31 Python + 12 JS = 43 pass, 0 fail. Syntax gates (node --check, py_compile) pass; index.html IDs verified, Codex/UNO artifacts confirmed gone. Wrote aidlc-docs/construction/build-and-test/{build,unit-test,integration-test,performance-test,build-and-test-summary}.md. Updated README.md to BindDeck×Claude. Deferred: live-claude keystroke smoke test (ACTION_KEYS bytes correctable without logic change) + real BindDeck hardware test + firmware compile (no toolchain). Per '한번에 하자', committing everything once at the end in worktree branch aidlc-retarget; never pushing to main/master."
+**Context**: CONSTRUCTION → Build & Test complete. Ready for final single commit.
+
+---
