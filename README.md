@@ -33,9 +33,11 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기는 개발자는 승�
 Node Bridge↔Python(PTY) 어댑터 통합은 남아 있습니다.
 
 매크로패드·스트림덱이 보통 단축키·명령으로 실행을 촉발한다면, HUMAN GATE의 버튼은 **이미 제안된
-실행 요청의 승인·거절**에 연결됩니다. `terminal.py`의 `ACTION_KEYS`·`send_choice()`는 승인 대기 중인
-요청에만, `request_id`별 최초 1회만 결정을 전달합니다. 다른 하네스와의 연동은 공통 프로토콜과
-하네스별 어댑터를 통한 확장 방향입니다.
+실행 요청의 승인·거절**에 연결됩니다. `terminal.py`의 `ACTION_KEYS`·`send_choice()`는 버튼 동작을 정해진
+PTY 키 시퀀스로 변환해 실행 중인 세션에 전달할 뿐 새 명령을 실행하지 않습니다. `server.py`는 Claude
+세션이 있을 때만 전송하며 같은 입력 요청 ID(`requestId`)의 중복 전송을 막습니다(이는 AI 요청별 1회
+제한이나 승인 대기 상태 검증을 뜻하지 않습니다). 다른 하네스와의 연동은 공통 프로토콜과 하네스별
+어댑터를 통한 확장 방향입니다.
 
 ## 두 가지 실물 구성
 
@@ -53,8 +55,8 @@ DOCKPAD는 **`demo/arduino-simulator/`에 코드로 구현·커밋된 실물 컨
 8은 MODE에 대응합니다. 노브로 자율성 0–5를 조절합니다.
 
 실제 Codex·Claude CLI를 PTY에서 구동하고, 물리 키로 AI-DLC 5단계(Initialization~Operation)를
-승인·진행합니다. 단계별 입력과 AI 결과는 실행 시점에 `aidlc-docs/01-initialization.md`~
-`05-operation.md`로 저장합니다. 저장소에는 **각 단계 문서의 골격(실행 규칙)만** 포함되며(입력란은
+승인·진행합니다. 단계별 입력과 AI 결과는 실행 시점에 DOCKPAD 앱 디렉터리 기준
+`aidlc-docs/01-initialization.md`~`05-operation.md`로 저장합니다. 저장소에는 **각 단계 문서의 골격(실행 규칙)만** 포함되며(입력란은
 `_미입력_`), 사용자 입력과 AI 결과는 실제 세션에서 채워집니다. UNO R4 WiFi 연결은 `board_wifi.py`의
 **HTTP 직결로 완결된 구현**이며 별도 브리지가 필요 없습니다.
 
@@ -62,7 +64,7 @@ DOCKPAD는 **`demo/arduino-simulator/`에 코드로 구현·커밋된 실물 컨
 통한 AI-DLC 단계 제어는 **팀이 실기기로 확인한 사람 검증·시연 결과**이며 자동 테스트가 증명하지 않습니다.
 사용법은 [`demo/arduino-simulator/README.md`](./demo/arduino-simulator/README.md)를 참고하십시오.
 
-리센느는 걸그룹 컨셉의 첫 테마 프로파일입니다. 페르소나는 컨셉이며, 팀 사진 키캡은 제작 예정입니다.
+리센느는 걸그룹 컨셉의 첫 테마 프로파일입니다. 페르소나는 컨셉입니다.
 
 ## 구현과 검증 범위
 
@@ -126,21 +128,21 @@ python3 server.py --mock                   # claude·하드웨어 없이 승인 
 ### 승인 게이트 활성화 (옵트인)
 
 allow/deny 게이트는 **기본 비활성**이며, 프로젝트 `.claude/settings.json`에는 등록하지 않습니다.
-브로커가 꺼져 있으면 개발용 세션의 모든 도구 호출이 대기하므로 별도 예시 settings로 옵트인 활성화합니다. 소프트웨어 체인(훅 프로세스 ↔ 브로커 ↔ 브라우저 resolver)은 테스트·curl 스모크로
+등록하면 모든 도구 호출이 이 게이트를 거치므로, 기본 설정에 넣지 않고 별도 예시 settings로만 옵트인 활성화합니다. 소프트웨어 체인(훅 프로세스 ↔ 브로커 ↔ 브라우저 resolver)은 테스트·curl 스모크로
 검증했고, **실행 중인 진짜 `claude`가 그 결정을 존중하는지의 라이브 확인은 사람이 수행**합니다.
 
 ```bash
 python3 server.py --show-gate-token     # 브로커 기동 + hook 토큰을 콘솔에 출력
 # 다른 터미널에서, Claude 세션을 게이트 settings로 실행:
 BUTTONLAB_URL=http://127.0.0.1:8765 \
-BUTTONLAB_HOOK_TOKEN=<위에서 출력된 hook 토큰> \
+BUTTONLAB_HOOK_TOKEN='위에서 출력된 hook 토큰으로 교체' \
 BUTTONLAB_BRIDGE_ID=$(hostname) \
 claude --settings hooks/hook-gate.settings.example.json
 ```
 
 `hook_bridge.py`는 도구 실행 직전 `/api/approval/wait`를 롱폴하고, 버튼(웹 UI 또는 실물 device 어댑터)이
-`/api/approval/resolve`로 `allow`/`deny`를 보낼 때까지 대기합니다. **브리지 응답이 없거나 오류면 `ask`로
-폴백**해 Claude 기본 권한 메뉴로 넘깁니다(자동 승인 없음). **토큰은 3가지 역할로 나뉩니다.** `ui`(조회+해결)·`device`
+`/api/approval/resolve`로 `allow`/`deny`를 보낼 때까지 대기합니다. **연결 실패·시간 초과 등 오류는 `ask`로
+폴백**해 Claude 기본 권한 메뉴로 넘기고, HTTP 400·403 응답은 `deny`로 처리합니다(자동 승인 없음). **토큰은 3가지 역할로 나뉩니다.** `ui`(조회+해결)·`device`
 (조회+해결)·`hook`(등록·대기만). hook 토큰은 **스스로 승인할 수 없어** 사람의 결정을 우회하지 못합니다.
 
 **브라우저 승인 패널.** 서버를 실행한 뒤 `http://127.0.0.1:8765/gate.html`을 열면 대기 중인 도구 실행
@@ -181,8 +183,8 @@ claude --settings hooks/hook-gate.settings.example.json
 
 ## 라이선스
 
-프로젝트 소스(서버·웹 터미널·펌웨어·훅·테스트·문서)는 **Apache License 2.0**으로 배포합니다 — 루트
-[`LICENSE`](./LICENSE), 저작권·적용 범위·제3자 고지는 [`NOTICE`](./NOTICE)를 참고하십시오. 프런트엔드
+프로젝트 소스(서버·웹 터미널·펌웨어·훅·테스트·문서)에는 **Apache License 2.0**을 적용해 루트
+[`LICENSE`](./LICENSE)·[`NOTICE`](./NOTICE)에 기재했습니다 — 저작권·적용 범위·제3자 고지는 이 파일들을 참고하십시오. 프런트엔드
 라이브러리 `xterm.js`·`addon-fit`는 `vendor/`에 포함된 제3자(MIT) 구성요소로 각자의 라이선스를
 유지합니다(`vendor/xterm-LICENSE`, `vendor/addon-fit-LICENSE`). 이 라이선스는 물리 하드웨어 설계나
 팀 사진 키캡 이미지의 권리까지 보장하지는 않습니다. **라이선스는 팀 최종 sign-off 대기 상태입니다.**
@@ -394,7 +396,7 @@ python3 -m venv .venv && ./.venv/bin/pip install hypothesis
   `node --test tests/*.test.js`로 실행합니다. 다만 이 테스트는 **가짜 CLI 프로세스**로
   질문·승인 프로토콜·세션 변경·커스텀 저장을 검증하며, **실제 Codex·Claude 응답이나 실물 보드를 대체하지 않습니다.**
 - **사람 검증·시연**: 실물 보드 업로드·배선·버튼 작동과 DOCKPAD의 실제 Codex·Claude 응답·물리 키를 통한
-  AI-DLC 단계 제어는 팀이 실기기로 확인했습니다. 시연 근거로 무편집 영상을 제출 전 시연 절에 첨부할 예정입니다.
+  AI-DLC 단계 제어는 팀이 실기기로 확인했습니다. 시연 근거인 무편집 영상은 위 시연 절의 `screenshots/demo.mp4`에서 확인할 수 있습니다.
 - **미검증 라이브 링크**: 실행 중인 진짜 `claude`가 allow/deny 게이트의 결정을 존중해 실제 도구 실행을
   허용·거부하는지는 사람/라이브 데모로 확인해야 합니다. 위 실기기 확인이나 소프트웨어 E2E에 포함하지 않습니다.
 - `ACTION_KEYS`의 리터럴 바이트는 설정값이므로 스모크 결과에 따라 로직 변경 없이 조정할 수 있습니다.
