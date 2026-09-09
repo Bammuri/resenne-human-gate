@@ -314,11 +314,13 @@ test('contextual knob rotation and press wait for matching Arduino echoes', asyn
 
 test('UNO R4 analog firmware accepts eight generic buttons and bounded A0 values', async () => {
   const port=new FakePort();port.readyLine='BUTTON_LAB_READY:3:slots=8:knob=analog\n';
-  const events=[];const bridge=new ButtonSerial(new FakeSerial(port),{onKey:(slot)=>events.push(['key',slot]),onPot:(value)=>events.push(['pot',value])});
+  const events=[];const bridge=new ButtonSerial(new FakeSerial(port),{onKey:(slot)=>events.push(['key',slot]),onPot:(value)=>events.push(['pot',value]),onPotReset:value=>events.push(['reset',value])});
   try {
     await bridge.connect();await tick();assert.equal(bridge.capabilities.analogKnob,true);
     port.emit('BUTTON_LAB_KEY:8\nBUTTON_LAB_POT:512\nBUTTON_LAB_POT:1024\n');await tick();
     assert.deepEqual(events,[['key',8],['pot',512]]);
+    port.emit('BUTTON_LAB_POT_RESET:800\nBUTTON_LAB_POT_RESET:1024\n');await tick();
+    assert.deepEqual(events,[['key',8],['pot',512],['reset',800]]);
   } finally {await bridge.disconnect();}
 });
 
@@ -335,13 +337,17 @@ test('Wi-Fi transport relays acknowledged keys and A0 without replaying old even
     }
     return {ok:true};
   };
-  const bridge=new ButtonWifi(request,{onKey:(slot,origin)=>seen.push([slot,origin]),onPot:value=>seen.push(['pot',value])});
+  const bridge=new ButtonWifi(request,{onKey:(slot,origin)=>seen.push([slot,origin]),onPot:value=>seen.push(['pot',value]),onPotReset:value=>seen.push(['reset',value])});
   try {
     await bridge.connect('192.168.4.1','test-key-123456789');
     await bridge.sendKey(2);await bridge.sendAudio('audio:volume:10');
     pending.push({line:'BUTTON_LAB_KEY:8'},{line:'BUTTON_LAB_POT:700'});
     await new Promise(resolve=>setTimeout(resolve,150));
     assert.deepEqual(seen,[['pot',512],[2,'simulator'],[8,'hardware'],['pot',700]]);
+    pending.push({line:'BUTTON_LAB_POT_RESET:800'},{line:'BUTTON_LAB_POT_RESET:1024'});
+    await new Promise(resolve=>setTimeout(resolve,150));
+    assert.deepEqual(seen.at(-1),['reset',800]);
+    assert.equal(seen.length,5);
     assert.equal(calls.filter(([path])=>path.endsWith('/command')).length,2);
   } finally {await bridge.disconnect();}
 });

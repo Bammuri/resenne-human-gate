@@ -8,6 +8,8 @@
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_NeoPixel.h>
 #include "board_config.h"
+#include "oled_text_frame.h"
+#include "oled_transport.h"
 
 const char* READY = "BUTTON_LAB_READY:3:slots=8:knob=analog";
 const uint32_t CONFIG_MAGIC = 0x424C5234;
@@ -18,12 +20,24 @@ struct Event { uint32_t id; char line[128]; } events[24];
 uint32_t sequence = 0;
 String bootId;
 TwoWire& oledWire = OLED_USE_QWIIC ? Wire1 : Wire;
-Adafruit_SSD1306 display(128, 64, &oledWire, -1);
+Adafruit_SSD1306 display(128, 64, &oledWire, -1, 100000UL, 100000UL);
+OledTransport<TwoWire> oledTransport(oledWire);
+uint32_t oledFrames=0, oledFailures=0, oledRecoveries=0, oledSuccessAt=0;
+bool oledForce=true;
+uint8_t oledBusBefore=3, oledBusAfter=3;
 Adafruit_NeoPixel pixels(8, 10, NEO_GRB + NEO_KHZ800);
 uint32_t keyLitAt[8] = {}, pixelsAt = 0;
 bool displayLinked = false;
 bool oledReady = false, oledDirty = true, apMode = false, networkReady = false;
 String profile = "agent", stage = "browse", runState = "ready", audioReply;
+uint32_t workingSince = 0;
+String audioQueue[12], audioPendingCommand, audioError;
+uint8_t audioQueueSize=0;
+uint32_t audioSentAt=0, volumeChangedAt=0;
+uint16_t audioGap=250;
+int audioVolume=3;
+bool volumeControl = false, volumePending = false;
+int volumeTarget = 0, volumeAnchor = 0;
 uint8_t level = 1;
 int potFiltered = 0, potLastSent = 0;
 uint32_t potAt = 0, oledAt = 0, networkAt = 0, networkLostAt = 0, reconnectAt = 0;
@@ -33,6 +47,17 @@ String httpRequest;
 uint32_t httpStarted = 0;
 String usbLine, audioLine;
 bool usbOverflow = false, audioOverflow = false;
+bool bootComplete=false;
+const char* bootStage="serial";
+
+void bootCheckpoint(const char* stageName) {
+  bootStage=stageName;
+  Serial.print("BUTTON_LAB_BOOT:");Serial.println(bootStage);
+}
+void waitWithUsb(uint32_t duration) {
+  uint32_t started=millis();
+  while(millis()-started<duration) { readSerial();delay(1); }
+}
 
 void emitLine(const String& line) {
   if (line.length() > 127) return;
@@ -65,29 +90,100 @@ bool displayCommand(String value) {
   if (!s.length() || s.length()>16 || !numberIn(l,0,p=="workflow"?5:3)) return false;
   for (unsigned int i=0;i<s.length();i++) if (!isLowerCase(s[i]) && s[i]!='_') return false;
   if (r!="ready" && r!="running" && r!="approved" && r!="stopped" && r!="error" && r!="question") return false;
+  if(displayLinked && profile==p && stage==s && level==l.toInt() && runState==r)return true;
+  if(r=="running" && runState!="running") workingSince=millis();
+  if(profile!=p || !displayLinked) {
+    volumeAnchor=potFiltered;potLastSent=potFiltered;
+    emitLine("BUTTON_LAB_POT_RESET:"+String(potFiltered));
+  }
+  volumeControl=p=="custom";
   profile=p; stage=s; level=l.toInt(); runState=r; displayLinked=true; oledDirty=true;
   return true;
 }
+uint8_t buttonSound(const String& mode, uint8_t slot) {
+  if(slot==8) return 8;
+  if(slot<1 || slot>7) return 0;
+  if(mode=="workflow") return slot+8;
+  if(mode=="custom") return slot<=4?slot+15:0;
+  return slot;
+}
+void queueButtonSound(uint8_t slot) {
+  // All custom-mode keys retain knob volume control; key 7 only stops audio.
+  volumeControl=profile=="custom";
+  volumeAnchor=potFiltered;potLastSent=potFiltered;
+  emitLine("BUTTON_LAB_POT_RESET:"+String(potFiltered));
+  oledDirty=true;
+  if(profile=="custom" && slot==7) { stopAudio();return; }
+  uint8_t track=buttonSound(profile,slot);
+  if(!track)return;
+  // Latest press wins; do not accumulate stale spoken button announcements.
+  audioQueueSize=0;
+  queueAudio("AT+VOL="+String(audioVolume));
+  queueAudio("AT+AMP=ON");
+  queueAudio("AT+PLAYFILE=/sound"+String(track)+".mp3");
+}
+bool queueAudio(const String& command) {
+  if(audioQueueSize>=12)return false;
+  audioQueue[audioQueueSize++]=command;return true;
+}
+void sendAudio(const String& command) {
+  Serial1.print(command);Serial1.print("\r\n");
+  // Warm the amplifier before decoding the new file, not after its intro.
+  audioGap=command=="AT+AMP=ON"?500:250;
+  audioSentAt=millis();emitLine("BUTTON_LAB_AUDIO_SENT:"+command);
+}
+void stopAudio() {
+  audioQueueSize=0;volumePending=false;
+  sendAudio("AT+AMP=OFF"); // Stop overrides a pending start/warm-up immediately.
+}
+void serviceButtonAudio() {
+  // Match the user's working firmware: paced commands, not mandatory OK gates.
+  if(millis()-audioSentAt<audioGap)return;
+  if(!audioQueueSize && volumePending && millis()-volumeChangedAt>=200) {
+    volumePending=false;queueAudio("AT+VOL="+String(audioVolume));
+  }
+  if(!audioQueueSize)return;
+  audioPendingCommand=audioQueue[0];
+  for(uint8_t i=1;i<audioQueueSize;i++)audioQueue[i-1]=audioQueue[i];
+  audioQueue[--audioQueueSize]="";
+  sendAudio(audioPendingCommand);
+}
 bool processCommand(const String& command) {
   if (command == "BUTTON_LAB_HELLO") { emitLine(READY); return true; }
+  if (command == "boot:info") { emitLine("BUTTON_LAB_BOOT:"+String(bootStage));return true; }
+  if (command == "oled:info") { reportOled();return true; }
+  if (command == "oled:refresh") { oledForce=true;oledDirty=true;return true; }
   if (command == "wifi:info") {
+    if(!bootComplete){emitLine("BUTTON_LAB_WIFI:starting");return true;}
     emitLine("BUTTON_LAB_WIFI:" + String(apMode?"AP:":"STA:") + WiFi.localIP().toString()); return true;
   }
   if (command.startsWith("display:")) return displayCommand(command.substring(8));
   if (command.startsWith("key:") && numberIn(command.substring(4),1,8)) {
     keyLitAt[command.substring(4).toInt()-1]=millis();
+    queueButtonSound(command.substring(4).toInt());
     emitLine("BUTTON_LAB_SIMULATED_KEY:"+command.substring(4)); return true;
   }
-  if (command=="mode:toggle") { emitLine("BUTTON_LAB_SIMULATED_MODE:toggle"); return true; }
+  if (command=="mode:toggle") { queueButtonSound(8);emitLine("BUTTON_LAB_SIMULATED_MODE:toggle"); return true; }
   if (command.startsWith("knob:")) {
     String value=command.substring(5);
     if (value!="left" && value!="right" && value!="press") return false;
+    if(profile=="custom" && value!="press") {
+      audioVolume=volumeTarget=constrain(audioVolume+(value=="right"?1:-1),0,30);
+      volumeAnchor=potFiltered;volumeChangedAt=millis();volumePending=true;oledDirty=true;
+    }
     emitLine("BUTTON_LAB_SIMULATED_KNOB:"+value); return true;
   }
   if (command.startsWith("pot:") && numberIn(command.substring(4),0,1023)) {
     emitLine("BUTTON_LAB_SIMULATED_POT:"+command.substring(4)); return true;
   }
   String at;
+  if(command=="audio:stop") { stopAudio();return true; }
+  if(command=="audio:test") {
+    audioQueueSize=0;volumePending=false;audioVolume=volumeTarget=3;
+    queueAudio("AT+VOL=3");queueAudio("AT+AMP=ON");
+    queueAudio("AT+PLAYFILE=/sound1.mp3");
+    return true;
+  }
   if (command=="audio:status") at="AT";
   else if (command=="audio:toggle") at="AT+PLAY=PP";
   else if (command=="audio:next") at="AT+PLAY=NEXT";
@@ -95,8 +191,8 @@ bool processCommand(const String& command) {
   else if (command.startsWith("audio:volume:") && numberIn(command.substring(13),0,30)) at="AT+VOL="+command.substring(13);
   else if (command.startsWith("audio:play:") && numberIn(command.substring(11),1,9999)) at="AT+PLAYNUM="+command.substring(11);
   else return false;
-  Serial1.print(at); Serial1.print("\r\n");
-  emitLine("BUTTON_LAB_AUDIO_SENT:"+at);
+  if(!queueAudio(at))return false;
+  if(command.startsWith("audio:volume:"))audioVolume=volumeTarget=command.substring(13).toInt();
   return true;
 }
 void scanInputs() {
@@ -106,12 +202,21 @@ void scanInputs() {
     if (reading!=buttons[i].reading) { buttons[i].reading=reading; buttons[i].changed=now; }
     if (now-buttons[i].changed>=30 && reading!=buttons[i].stable) {
       buttons[i].stable=reading;
-      if (reading==LOW) { keyLitAt[i]=now; emitLine("BUTTON_LAB_KEY:"+String(i+1)); }
+      if (reading==LOW) { keyLitAt[i]=now; queueButtonSound(i+1);emitLine("BUTTON_LAB_KEY:"+String(i+1)); }
     }
   }
   if (now-potAt>=10) {
     potAt=now;
     potFiltered=(potFiltered*3+(POT_REVERSED ? 1023-analogRead(A0) : analogRead(A0)))/4;
+    if(volumeControl) {
+      potLastSent=potFiltered;
+      if(abs(potFiltered-volumeAnchor)>=24) {
+        volumeAnchor=potFiltered;
+        int next=constrain((potFiltered*30+511)/1023,0,30);
+        if(next!=volumeTarget) { audioVolume=volumeTarget=next;volumeChangedAt=now;volumePending=true;oledDirty=true; }
+      }
+      return;
+    }
     if (abs(potFiltered-potLastSent)>=12) {
       potLastSent=potFiltered;
       emitLine("BUTTON_LAB_POT:"+String(potFiltered));
@@ -128,55 +233,129 @@ void readSerial() {
   }
   for (uint8_t n=0;n<96 && Serial1.available();n++) {
     char c=Serial1.read();
-    if (c=='\n') {
-      if (!audioOverflow && audioLine.length()) { audioReply=audioLine; emitLine("BUTTON_LAB_AUDIO:"+audioLine); }
+    if (c=='\n' || c=='\r') {
+      if (!audioOverflow && audioLine.length()) {
+        audioLine.trim();audioReply=audioLine;emitLine("BUTTON_LAB_AUDIO:"+audioLine);
+        // Responses are observable, but cannot be reliably matched to commands.
+        if(audioLine.startsWith("ERR")) {
+          audioError=audioLine;emitLine("BUTTON_LAB_AUDIO_ERROR:"+audioError);
+          audioQueueSize=0;volumePending=false;
+        }
+      }
       audioLine=""; audioOverflow=false;
-    } else if (c!='\r') { if (audioLine.length()<100) audioLine+=c; else audioOverflow=true; }
+    } else { if (audioLine.length()<100) audioLine+=c; else audioOverflow=true; }
   }
 }
-void centeredText(const String& text, int y, uint8_t size) {
-  display.setTextSize(size);
-  display.setCursor(max(0, (128 - (int)text.length()*6*size)/2), y);
-  display.print(text);
+void reportOled() {
+  emitLine("BUTTON_LAB_OLED:"+String(oledReady?"OK":"ERROR")+
+    ":address="+String(oledTransport.address,HEX)+":error="+String(oledTransport.error)+
+    ":frames="+String(oledFrames)+":failures="+String(oledFailures)+
+    ":bus="+String(oledBusBefore)+">"+String(oledBusAfter));
+}
+bool releaseOledClock(uint8_t scl) {
+  pinMode(scl,INPUT); // Release only; never drive a 5V HIGH onto the module.
+  uint32_t started=micros();
+  while(digitalRead(scl)==LOW && micros()-started<1000) {}
+  return digitalRead(scl)==HIGH;
+}
+void clearOledBus() {
+  // NXP UM10204 3.1.16: up to nine clocks for stuck SDA, then STOP.
+  // https://www.nxp.com/docs/en/user-guide/UM10204.pdf
+  const uint8_t sda=OLED_USE_QWIIC?WIRE1_SDA_PIN:WIRE_SDA_PIN;
+  const uint8_t scl=OLED_USE_QWIIC?WIRE1_SCL_PIN:WIRE_SCL_PIN;
+  oledWire.end();pinMode(sda,INPUT);pinMode(scl,INPUT);delayMicroseconds(10);
+  oledBusBefore=(digitalRead(sda)==HIGH?2:0)|(digitalRead(scl)==HIGH?1:0);
+  if(releaseOledClock(scl) && digitalRead(sda)==LOW) {
+    for(uint8_t pulse=0;pulse<9 && digitalRead(sda)==LOW;pulse++) {
+      digitalWrite(scl,LOW);pinMode(scl,OUTPUT);delayMicroseconds(10);
+      if(!releaseOledClock(scl))break;
+      delayMicroseconds(10);
+    }
+    // SCL low before SDA low, then release SCL followed by SDA: STOP.
+    digitalWrite(scl,LOW);pinMode(scl,OUTPUT);
+    digitalWrite(sda,LOW);pinMode(sda,OUTPUT);delayMicroseconds(10);
+    releaseOledClock(scl);delayMicroseconds(10);
+    pinMode(sda,INPUT);delayMicroseconds(10);
+  }
+  oledBusAfter=(digitalRead(sda)==HIGH?2:0)|(digitalRead(scl)==HIGH?1:0);
+}
+bool beginOled() {
+  if(!oledTransport.probe())return false;
+  // Adafruit is used for its framebuffer/font, not its unchecked transfers.
+  // Do not let begin() re-open a Wire bus already configured by this sketch.
+  if(!display.getBuffer() && !display.begin(SSD1306_SWITCHCAPVCC,oledTransport.address,false,false)) {
+    oledTransport.error=4;return false;
+  }
+  return oledTransport.configure();
 }
 void renderDisplay() {
-  bool working = runState=="running";
-  if (!oledReady || (!oledDirty && !working) || millis()-oledAt<(working?350:150)) return;
-  oledAt=millis(); oledDirty=false;
-  display.clearDisplay(); display.setTextSize(1); display.setTextColor(SSD1306_WHITE); display.setTextWrap(false);
-  if (!displayLinked) {
-    centeredText("CONNECT", 4, 2);
-    centeredText(apMode?"WI-FI SETUP":"USB / WI-FI", 29, 1);
-    centeredText(networkReady?WiFi.localIP().toString():"USB READY", 48, 1);
-    display.display(); return;
+  uint32_t now=millis();
+  bool refresh=oledForce || now-oledSuccessAt>=5000;
+  if(now-oledAt<(oledReady?250UL:2000UL))return;
+  if(oledReady && !oledDirty && !refresh)return;
+  oledAt=millis();oledDirty=false;
+  if(!oledReady) {
+    clearOledBus();
+    oledWire.begin();oledWire.setWireTimeout(25000);oledWire.setClock(100000);
+    if(!beginOled()) { oledFailures++;reportOled();return; }
+    oledRecoveries++;refresh=true;
   }
-  display.setCursor(0,0); display.print(profile=="workflow"?"2 AI-DLC":profile=="custom"?"3 CUSTOM":"1 AI");
-  if (working) {
-    if ((millis()/350)%2) display.fillCircle(123,3,3,SSD1306_WHITE);
-    else display.drawCircle(123,3,3,SSD1306_WHITE);
+  OledTextFrame frame;
+  if(!bootComplete) {
+    frame.set(0,"Re:senne");
+    frame.set(1,"STARTING...");
+  } else if(!displayLinked) {
+    frame.set(0,"Re:senne");
+    frame.set(1,"CONNECT USB / WIFI");
+    frame.set(2,apMode?"WIFI SETUP":"BOARD READY");
+    String ip=networkReady?WiFi.localIP().toString():"USB READY";
+    frame.set(3,ip.c_str());
+  } else if(profile=="custom") {
+    frame.set(0,"MODE 3 SOUND");
+    char volume[21];snprintf(volume,sizeof(volume),"VOLUME %d / 30",volumeTarget);
+    frame.set(1,volume);
+    frame.set(2,"KNOB: VOLUME");
+    frame.set(3,"1-4 PLAY / 7 STOP");
+  } else {
+    frame.set(0,profile=="workflow"?"MODE 2 AI-DLC":"MODE 1 AI CONTROL");
+    String title=stage;title.toUpperCase();
+    frame.set(1,title.c_str());
+    if(profile=="workflow") {
+      char autonomy[21];snprintf(autonomy,sizeof(autonomy),"AUTONOMY %u / 5",level);
+      frame.set(2,autonomy);
+    } else {
+      const char* efforts[]={"EFFORT LOW","EFFORT MEDIUM","EFFORT HIGH","EFFORT XHIGH"};
+      frame.set(2,efforts[min((uint8_t)3,level)]);
+    }
+    String stateText=runState;stateText.toUpperCase();
+    frame.set(3,runState=="question"?"CHOOSE KEY 1-7":stateText.c_str());
   }
-  String title=stage; title.toUpperCase();
-  if (stage=="question") title="ANSWER";
-  if (stage=="ask_workflow") title="ASK";
-  if (stage=="start_workflow") title="RUN NOW";
-  if (stage=="browse") title="SCROLL";
-  centeredText(title, title.length()>10?22:17, title.length()>10?1:2);
-  String detail;
-  if (stage=="question") detail="PICK 1-7";
-  else if (stage=="model" && profile!="workflow") { const char* efforts[]={"LOW","MEDIUM","HIGH","XHIGH"}; detail=efforts[level]; }
-  else if (profile=="workflow") { const char* modes[]={"MANUAL","GUIDE","STEP","AUTO CHECK","AUTO BUILD","FULL AUTO"}; detail=modes[level]; }
-  else detail=stage=="build"?"HISTORY":stage=="denied"?"EDIT CURSOR":stage=="accept"?"SELECT":stage=="plan"?"PLAN PAGE":stage=="check"?"CHECK LOG":"SCROLL";
-  centeredText(detail, 39, 1);
-  String status=runState; status.toUpperCase();
-  if (runState=="question") status="? ANSWER";
-  if (runState=="error") status="! ERROR";
-  centeredText(status, 55, 1);
-  display.display();
+  static OledTextFrame previous;
+  static bool hasPrevious=false;
+  if(!refresh && hasPrevious && frame.equals(previous))return;
+  display.clearDisplay();
+  display.setRotation(0);display.setFont(NULL);display.setTextSize(1);
+  display.setTextWrap(false);display.setTextColor(SSD1306_WHITE,SSD1306_BLACK);
+  for(uint8_t row=0;row<OledTextFrame::ROWS;row++) {
+    display.setCursor(OledTextFrame::LEFT,OledTextFrame::rowY(row));
+    display.print(frame.lines[row]);
+  }
+  // Restore addressing/offset even when the logical text has not changed:
+  // a module power interruption must not leave a permanently blank screen.
+  bool wasReady=oledReady;
+  oledReady=oledTransport.configure() && oledTransport.frame(display.getBuffer());
+  if(!oledReady) { oledFailures++;oledDirty=true;oledForce=true;reportOled();return; }
+  previous=frame;hasPrevious=true;oledForce=false;oledFrames++;oledSuccessAt=millis();
+  if(!wasReady || oledFrames==1)reportOled();
 }
 String statusJson() {
   return "{\"board\":\"UNO R4 WiFi\",\"protocol\":3,\"boot\":"+jsonString(bootId)+",\"cursor\":"+String(sequence)+
     ",\"mode\":"+jsonString(apMode?"ap":"station")+",\"ip\":"+jsonString(WiFi.localIP().toString())+
-    ",\"pot\":"+String(potFiltered)+",\"oled\":"+(oledReady?"true":"false")+",\"audioReply\":"+jsonString(audioReply)+"}";
+    ",\"pot\":"+String(potFiltered)+",\"oled\":"+(oledReady?"true":"false")+
+    ",\"oledAddress\":"+String(oledTransport.address)+",\"oledError\":"+String(oledTransport.error)+
+    ",\"oledFrames\":"+String(oledFrames)+",\"oledFailures\":"+String(oledFailures)+
+    ",\"oledRecoveries\":"+String(oledRecoveries)+",\"oledFrameAgeMs\":"+String(millis()-oledSuccessAt)+
+    ",\"audioReply\":"+jsonString(audioReply)+",\"audioError\":"+jsonString(audioError)+"}";
 }
 void respondHttp(int code, const String& body, const char* type="application/json") {
   httpClient.print("HTTP/1.1 ");httpClient.print(code);httpClient.println(code==200?" OK":code==401?" Unauthorized":" Error");
@@ -260,15 +439,45 @@ void serviceNetwork() {
 }
 void setup() {
   Serial.begin(115200);Serial1.begin(115200);analogReadResolution(10);
+  bootCheckpoint("usb-ready");waitWithUsb(1500);
   for(uint8_t i=0;i<8;i++){buttons[i]={uint8_t(i+2),HIGH,HIGH,0};pinMode(buttons[i].pin,INPUT_PULLUP);buttons[i].reading=buttons[i].stable=digitalRead(buttons[i].pin);}
   potFiltered=potLastSent=POT_REVERSED ? 1023-analogRead(A0) : analogRead(A0); // No pull-up, no startup action.
+  audioVolume=volumeTarget=3; // Quiet startup; the knob adjusts in mode 3.
+  bootCheckpoint("oled-begin");
   oledWire.begin();
+  oledWire.setWireTimeout(25000);
+  oledWire.setClock(100000);
   pixels.begin(); pixels.setBrightness(20); pixels.clear(); pixels.show();
-  for(uint8_t address=0x3C;address<=0x3D && !oledReady;address++){oledWire.beginTransmission(address);if(oledWire.endTransmission()==0)oledReady=display.begin(SSD1306_SWITCHCAPVCC,address);}
+  // Only a fully acknowledged frame may set oledReady. Draw before audio/Wi-Fi waits.
+  oledAt=millis()-2000UL;renderDisplay();
+  bootCheckpoint("oled-done");
   EEPROM.get(0,config);config.ssid[32]=0;config.password[64]=0;
+#if defined(BOARD_STA_SSID) && defined(BOARD_STA_PASSWORD) && defined(BOARD_STA_REVISION)
+  // Provision once per credentials revision, without undoing later portal edits.
+  uint32_t provisionedRevision;
+  EEPROM.get(144,provisionedRevision);
+  if(config.magic!=CONFIG_MAGIC || provisionedRevision!=BOARD_STA_REVISION){
+    static_assert(sizeof(BOARD_STA_SSID)<=sizeof(config.ssid), "SSID too long");
+    static_assert(sizeof(BOARD_STA_PASSWORD)<=sizeof(config.password), "Password too long");
+    config.magic=CONFIG_MAGIC;
+    strcpy(config.ssid,BOARD_STA_SSID);strcpy(config.password,BOARD_STA_PASSWORD);
+    EEPROM.put(0,config);
+    provisionedRevision=BOARD_STA_REVISION;EEPROM.put(144,provisionedRevision);
+  }
+#endif
   EEPROM.get(128,boot);if(boot.magic!=CONFIG_MAGIC){boot.magic=CONFIG_MAGIC;boot.count=0;}boot.count++;EEPROM.put(128,boot);bootId=String(boot.count,HEX);
   httpRequest.reserve(1536);usbLine.reserve(256);audioLine.reserve(101);
-  startNetwork();renderDisplay();Serial1.print("AT\r\n");
+  bootCheckpoint("audio-init");
+  // Exact startup sequence from the user's confirmed-working sketch.
+  // Boot-only waits keep normal button, display and network handling nonblocking.
+  waitWithUsb(2000);sendAudio("AT+VOL=0");waitWithUsb(250);
+  sendAudio("AT+FUNCTION=1");waitWithUsb(2000);
+  sendAudio("AT+AMP=OFF");waitWithUsb(250);
+  sendAudio("AT+PLAYMODE=3");waitWithUsb(250);
+  sendAudio("AT+VOL=3");
+  bootCheckpoint("wifi-init");
+  startNetwork();renderDisplay();
+  bootComplete=true;bootCheckpoint("ready");oledDirty=true;
 }
 void renderPixels() {
   if (millis()-pixelsAt<40) return;
@@ -289,4 +498,4 @@ void renderPixels() {
   }
   pixels.show();
 }
-void loop(){scanInputs();readSerial();serviceNetwork();renderDisplay();renderPixels();}
+void loop(){scanInputs();readSerial();serviceNetwork();serviceButtonAudio();renderDisplay();renderPixels();}

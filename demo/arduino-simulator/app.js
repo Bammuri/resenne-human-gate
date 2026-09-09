@@ -56,11 +56,18 @@ function updateOled() {
   const view = oledState(), flow = deck.config.mode === "workflow";
   $("#deck-oled-mode").textContent = flow ? "2 AI-DLC" : deck.config.mode === "custom" ? "3 CUSTOM" : browserTerminal.running ? (browserTerminal.kind.startsWith("claude") ? "1 CLAUDE" : "1 CODEX") : "1 AI";
   $("#deck-oled-stage").textContent = view.title;
-  $("#deck-oled-stage").style.fontSize = view.title.length > 10 ? "14px" : "21px";
+  $("#deck-oled-stage").style.fontSize = "8px";
   $("#deck-oled-depth").textContent = view.detail;
   $("#deck-oled-status").textContent = ({question: deck.waiting ? "SENT" : "? ANSWER", running: "RUNNING", approved: "APPROVED", stopped: "STOPPED", error: "! ERROR", ready: "READY"})[view.status];
-  $("#deck-oled-indicator").classList.toggle("working", view.status === "running");
-  $("#deck-oled-indicator").setAttribute("visibility", view.status === "running" ? "visible" : "hidden");
+  for (const [id, maxSize, width] of [["mode",8,120],["stage",8,120],["depth",8,120],["status",8,120]]) {
+    const node=$("#deck-oled-"+id);
+    node.textContent=node.textContent.slice(0,20);
+    node.style.fontSize=`${maxSize}px`;
+    const measured=node.getComputedTextLength();
+    if(measured>width)node.style.fontSize=`${maxSize*width/measured}px`;
+  }
+  $("#deck-oled-indicator").classList.remove("working");
+  $("#deck-oled-indicator").setAttribute("visibility", "hidden");
   $("#circuit-stage").dataset.mode = flow ? workflow?.data.stage || "initialization" : browserTerminal.mode;
   $("#circuit-stage").dataset.effort = EFFORTS[flow ? Math.round(view.level * 3 / (AUTONOMY.length - 1)) : view.level];
   clearTimeout(oledTimer); oledTimer = setTimeout(syncOled, 100);
@@ -77,6 +84,7 @@ function available(action, transport = true) {
   if (!action) return false;
   if (transport && (state.serialBusy || (state.source === "hardware" && serialBridge.state !== "connected"))) return false;
   if (action.action === "mode") return !configSaving;
+  if (["board_sound", "audio_stop"].includes(action.action)) return state.source === "hardware" && serialBridge.state === "connected";
   if (!state.serverOnline || state.busy) return false;
   if (action.workflow) return action.action === "ask_workflow" || (!workflow?.pending && (action.action !== "start_workflow" || !workflow?.data.running));
   if (["codex-yolo", "claude-yolo"].includes(action.action)) return !browserTerminal.running && !browserTerminal.pending && Boolean(state.session?.[action.action === "codex-yolo" ? "codexAvailable" : "claudeAvailable"]);
@@ -211,14 +219,20 @@ async function executeKey(item, source) {
   let commandPending = false;
   try {
     if (item.action === "mode") return await toggleProfile();
+    if (["board_sound", "audio_stop"].includes(item.action)) {
+      // Hardware presses and acknowledged screen keys already run audio on UNO.
+      // Do not send a duplicate playback command or an AI terminal action.
+      status(item.action === "audio_stop" ? "음성 출력 정지 명령 전달" : `${item.label} · 음성 재생 명령 전달`);
+      return;
+    }
     if (item.workflow) return await workflow.trigger(item.action);
     if (deck.toggleSelection(item)) { status(`${deck.selected.size}개 선택 · 선택 완료 버튼으로 답변을 전달하세요.`); return; }
     commandPending = true; state.busy = true; setControls();
     if (["codex-yolo", "claude-yolo"].includes(item.action)) { await browserTerminal.start(item.action); return; }
     if (item.action === "model" && deck.config.mode === "agent") {
-      if (deck.knobAction === "model" && browserTerminal.running) await browserTerminal.nativeCommand("/model");
+      await sendCommand(item);
       deck.knobAction = "model";
-      status("MODEL 선택 · A0 노브로 추론 강도 조절 · MODEL을 다시 누르면 모델 목록");
+      status("MODEL 목록 요청 전달 · 목록을 닫은 뒤 A0 노브로 추론 강도 조절");
     } else {
       await sendCommand(item);
       if (deck.config.mode === "agent" && item.action !== "answer") deck.knobAction = item.action;
@@ -293,6 +307,10 @@ async function useKnob(value, origin = "screen") {
   const binding = knobBinding(deck.config.mode, deck.knobAction, deck.question);
   const press = value === "press", delta = value === "left" ? -1 : 1;
   try {
+    if (binding.rotate === "volume") {
+      status(state.source === "hardware" ? "음량 조절 입력 전달 · OLED에서 설정값을 확인하세요." : "실물 보드를 연결하면 모드 3 노브로 음량을 조절합니다.");
+      return;
+    }
     if (!press && binding.rotate === "questions") { deck.movePage(delta); renderProfile(); return; }
     if (binding.rotate === "effort" && !press || binding.rotate === "autonomy") {
       const current = binding.rotate === "autonomy" ? workflow.data.autonomy : EFFORTS.indexOf(state.effort);
@@ -328,6 +346,8 @@ function applyPot(value, reverseConfirmed = false) {
   clearTimeout(potReverseTimer); potReverseTimer = null;
   potPosition = value;
   const identity = knobIdentity();
+  // Custom-mode analog volume is applied locally by the firmware, not the AI.
+  if (deck.config.mode === "custom") { potAnchor=value;potContext=identity;potDirection=0;return; }
   if (potContext !== identity || potAnchor === null) { potContext=identity;potAnchor=value;potDirection=0;return; }
   if (state.busy || state.serialBusy || browserTerminal.nativePending) { potAnchor=value;return; }
   const delta=value-potAnchor;
@@ -367,6 +387,10 @@ function applyPot(value, reverseConfirmed = false) {
 const boardCallbacks = {
   onKey: (slot, origin) => triggerKey(slot, origin),
   onPot: value => applyPot(value),
+  onPotReset: value => {
+    clearTimeout(potReverseTimer);potReverseTimer=null;
+    potPosition=value;potAnchor=null;potDirection=0;potContext="";
+  },
   onKnob: (value, origin) => useKnob(value, origin),
   onEffort: (effort, origin) => { if (state.source !== "hardware" || state.serialBusy) return; lastOled = ""; applyEffort(effort, origin); },
   onLog: line => log(serialBridge.isWifi ? "WIFI" : "USB", line),
@@ -470,9 +494,11 @@ function openCustom() {
     for (const [value, text] of [["prompt", "프롬프트 보내기"], ["accept", "ACCEPT · 동의"], ["denied", "DENIED · 거절"], ["continue", "CONTINUE · 계속"], ["retry", "RETRY · 재시도"], ["stop", "STOP · 웹 AI 중단"]]) action.add(new Option(text, value)); action.value = entry.action;
     const prompt = field("text", "전송할 프롬프트 (비워 두면 버튼 비활성)", document.createElement("textarea")); prompt.value = entry.text || ""; prompt.rows = 2; prompt.maxLength = 8192;
     const update = () => { prompt.disabled = action.value !== "prompt"; };
-    action.onchange = update; update(); return row;
+    action.onchange = update; update();
+    if (i < 4 || i === 6) { row.disabled = true; legend.textContent = `버튼 ${i+1} · ${["거제야호", "오이시", "러브어택", "대자부", "", "", "STOP"][i]} 고정 (기존 설정은 보존됨)`; }
+    return row;
   });
-  $("#custom-entries").replaceChildren(...rows); $("#custom-status").textContent = "질문 대기 중에는 모든 모드에서 번호 선택이 우선합니다."; $("#custom-dialog").showModal();
+  $("#custom-entries").replaceChildren(...rows); $("#custom-status").textContent = "모드 3에서는 노브가 항상 음량을 조절합니다. 1~4번 음원 재생 · 5~6번 사용자 지정 · 7번 음성 STOP."; $("#custom-dialog").showModal();
 }
 $("#custom-open").onclick = openCustom;
 $("#custom-close").onclick = () => $("#custom-dialog").close();

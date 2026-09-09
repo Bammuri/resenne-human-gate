@@ -73,6 +73,11 @@ class WebTerminal:
                     args.append("--dangerously-skip-permissions")
             else:
                 args = [shell, "-l"]
+            if kind != "shell":
+                # Let the CLI submit after its own startup/trust checks. Sending
+                # timed PTY keystrokes could answer an onboarding menu instead.
+                # Only a new process gets this prompt; polling never resends it.
+                args.append("hi")
             master, slave = pty.openpty()
             try:
                 fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))

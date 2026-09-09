@@ -57,7 +57,7 @@ class BrowserTerminal {
     document.querySelectorAll("[data-service]").forEach(button => {
       const available = button.dataset.service.startsWith("claude") ? this.options.hasClaude() : this.options.hasCodex();
       button.disabled = disabled || !available;
-      button.title = available ? "선택하면 시작합니다." : "CLI를 찾을 수 없습니다.";
+      button.title = available ? "새 세션을 시작하고 hi를 자동 전송합니다." : "CLI를 찾을 수 없습니다.";
     });
     document.querySelector("#terminal-stop").disabled = this.pending || !this.running;
     document.querySelector("#terminal-prompt-form").hidden = !this.managed;
@@ -118,7 +118,7 @@ class BrowserTerminal {
       this.inputBlocked = false;
       this.options.onStarted(kind);
       if (this.managed) document.querySelector("#terminal-prompt").focus(); else this.term.focus();
-      this.message(!this.managed ? "CLI 터미널입니다. 화면을 클릭해 직접 입력하세요. 한글·줄바꿈·단축키도 터미널에서 사용합니다." : kind.endsWith("-yolo") ? "YOLO 모드 · 권한 확인을 생략합니다. 아래 입력창에서 첫 요청을 보내세요."
+      this.message(!this.managed ? (kind === "shell" ? "터미널에 명령을 입력하세요." : "첫 메시지 hi를 자동 전송하도록 시작했습니다. 로그인·신뢰 확인이 나오면 먼저 완료해 주세요. 응답 후 바로 입력할 수 있습니다.") : kind.endsWith("-yolo") ? "YOLO 모드 · 권한 확인을 생략합니다. 아래 입력창에서 첫 요청을 보내세요."
         : codex || kind === "claude" ? `새 ${codex ? "Codex" : "Claude"} 세션입니다. 아래 입력창에서 첫 요청을 보내세요.` : "터미널에 명령을 입력하세요. codex 명령도 실행할 수 있습니다.");
       return true;
     } catch (error) { this.message(error.message); return false; }

@@ -1,4 +1,5 @@
 import base64
+import json
 from pathlib import Path
 import os
 import sys
@@ -60,6 +61,13 @@ class TerminalTests(unittest.TestCase):
                 self.assertIn('True True', output)
                 self.assertNotIn('app-server', output)
                 self.assertNotIn('--print', output)
+                args = json.loads(output.split('CLI_READY ', 1)[1].split(' True True', 1)[0])
+                self.assertEqual(args[-1], 'hi')
+                self.assertEqual(args.count('hi'), 1)
+                # Reattaching/polling must not start a second greeting/process.
+                process = self.terminal.process
+                self.terminal.snapshot()
+                self.assertIs(self.terminal.process, process)
                 flag = '--dangerously-skip-permissions' if kind.startswith('claude') else '--dangerously-bypass-approvals-and-sandbox'
                 self.assertEqual(flag in output, kind.endswith('yolo'))
                 self.terminal.write('hello-cli\r', snapshot['generation'])

@@ -1,6 +1,7 @@
 # 시뮬레이터 연동용 UNO R4 WiFi
 
-`simulator_r4.ino`, `board_config.h`, `wifi_credentials.h`가 한 폴더에 있어야 합니다.
+`simulator_r4.ino`, `board_config.h`, `wifi_credentials.h`, `oled_text_frame.h`,
+`oled_transport.h`가 한 폴더에 있어야 합니다.
 보드 AP 이름은 `DM`이며 접속 비밀번호는 로컬 `wifi_credentials.h`에서 관리합니다.
 웹 다운로드에는 실제 비밀번호가 없는 `board_config.example.h`만 제공합니다.
 이 스케치는 `arduino-simulator`의 실물 탭용입니다. 앞서 만든 `uno_r4_soundboard`와 다릅니다.
@@ -18,6 +19,10 @@
   AI 수준·자율성은 작은 회전마다 한 단계씩 상대적으로 조절합니다. 시계방향은 증가,
   반시계방향은 감소입니다. 웹에서 ADC 변화량 48을 한 단계 기준으로 사용하며 작은 떨림은 무시합니다.
 - OLED: SSD1306 128×64, A4/A5 Wire, 0x3C/0x3D 탐색. 모드·단계·수준·상태를 표시합니다.
+  전원을 켜면 제품명 `Re:senne`와 `STARTING...`을 표시하며, 연결 대기 중에도 제품명을 유지합니다.
+  기본 6×8 글꼴, 최대 20자×4줄, 가장자리 4픽셀 여백을 사용합니다.
+  데이터는 16바이트씩 전송하고 각 전송의 I2C 응답을 확인합니다.
+  실패 시 2초 간격으로 재초기화하며, 정상일 때도 5초마다 화면 설정과 내용을 복원합니다.
 - D10 WS2812B 8개: 낮은 밝기(20/255), 키 입력 흰색, 모드/진행 상태 표시.
 - DFPlayer Pro: Serial1 115200, 웹 연결 설정의 음원 제어 명령을 전달합니다.
   6번·7번 버튼을 음원 정지/다음 곡에 연결하지 않습니다.
@@ -56,11 +61,21 @@ LED 외부 전원을 먼저 켜고 UNO를 켜며, 끌 때는 UNO부터 끕니다
 ```text
 BUTTON_LAB_HELLO
 wifi:info
+oled:info
+oled:refresh
 audio:status
 ```
 
 준비 응답은 `BUTTON_LAB_READY:3:slots=8:knob=analog`입니다.
 음원 통신 확인 응답은 `BUTTON_LAB_AUDIO:OK`입니다.
+`oled:info`는 주소·전송 오류·완료 프레임·실패 횟수를 반환합니다.
+`bus=전>후`는 복구 전후 SDA/SCL 상태입니다(3=둘 다 HIGH, 1=SDA LOW, 2=SCL LOW, 0=둘 다 LOW).
+초기화 실패 시 SDA가 LOW에 걸렸다면 최대 9개의 클록과 STOP으로 버스 복구를 시도합니다.
+출력을 HIGH로 강제하지 않고 LOW/입력 해제로만 동작합니다.
+`oled:refresh`는 모드나 음원을 바꾸지 않고 화면만 다시 전송합니다.
+`/status`의 `oled`는 마지막 전체 프레임 전송 성공 여부이며, `oledFrames`,
+`oledFailures`, `oledError`, `oledFrameAgeMs`로 갱신을 확인할 수 있습니다.
+I2C 응답 성공이 실제 패널의 발광·육안 표시까지 검증하는 것은 아닙니다.
 실물 버튼은 `BUTTON_LAB_KEY:1`~`:8`, 웹에서 보드로 보낸 키는 `BUTTON_LAB_SIMULATED_KEY:n`으로 응답합니다.
 Wi-Fi `/status`, `/events?after=N`, `/command`는 토큰 없이 시뮬레이터의 로컬 서버를 통해 사용합니다.
 보드만 켜 두면 AI 작업이 실행되는 것은 아니며, 시뮬레이터 서버와 웹 화면이 연결되어 있어야 합니다.

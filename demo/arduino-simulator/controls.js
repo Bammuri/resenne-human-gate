@@ -73,6 +73,7 @@ const KNOB_BINDINGS = {
   stop: { label: "LOG SCROLL", hint: "회전: 중단 전 로그 탐색 · 누름: 최신 출력", rotate: "scroll", press: "bottom" },
 };
 function knobBinding(mode, action, question) {
+  if (mode === "custom") return { label: "VOLUME", hint: "모드 3: 회전으로 음량 0–30 조절 · 시계방향 증가 · 7 STOP", rotate: "volume", press: "none" };
   if (question) return { label: "ANSWER PAGE", hint: "회전: 보기 페이지 이동 · 답변은 번호 버튼", rotate: "questions", press: "focus" };
   if (mode === "workflow") return { label: "AUTONOMY", hint: "회전: AI-DLC 자율성 · 누름: 다음 단계", rotate: "autonomy", press: "autonomy" };
   return mode === "agent" ? KNOB_BINDINGS[action] || KNOB_BINDINGS.browse : KNOB_BINDINGS.browse;
@@ -80,7 +81,7 @@ function knobBinding(mode, action, question) {
 
 const DECK_MODES = ["agent", "workflow", "custom"];
 const AGENT_KEYS = [
-  ["model", "MODEL", "노브 추론 강도 · 다시 누르면 모델 목록"],
+  ["model", "MODEL", "클릭하면 모델 목록 · 노브 추론 강도"],
   ["plan", "PLAN", "계획 모드 · 변경 전 설계"],
   ["build", "BUILD", "계획 모드를 나와 구현 준비"],
   ["check", "CHECK", "테스트 실행 및 요구사항 검증"],
@@ -137,6 +138,8 @@ class DeckControls {
     if (!Number.isInteger(slot) || slot < 1 || slot > 8) return null;
     const base = { slot, mode: this.config.mode, selectedTarget: this.target, context: this.identity(), page: this.page };
     if (slot === 8) return { ...base, action: "mode", label: "MODE" };
+    if (this.config.mode === "custom" && slot <= 4) return { ...base, action: "board_sound", label: ["거제야호", "오이시", "러브어택", "대자부"][slot-1] };
+    if (this.config.mode === "custom" && slot === 7) return { ...base, action: "audio_stop", label: "STOP" };
     if (this.question) {
       const option = this.question.options[this.page * 7 + slot - 1];
       if (!option || this.waiting) return null;

@@ -3,6 +3,55 @@ const assert = require('node:assert/strict');
 const { terminalQuestion, terminalAnswer, terminalMode } = require('../controls');
 const { DeckControls, DECK_MODES } = require('../controls');
 
+test('custom mode always binds the knob to volume without reserving key five', () => {
+  const {knobBinding} = require('../controls');
+  for(const action of [null,'model','stop','audio_stop']) {
+    assert.equal(knobBinding('custom',action,null).rotate,'volume');
+    assert.equal(knobBinding('custom',action,{id:'q'}).rotate,'volume');
+  }
+  assert.equal(knobBinding('agent','model',null).rotate,'effort');
+  assert.equal(knobBinding('workflow',null,null).rotate,'autonomy');
+  const deck = new DeckControls([]);
+  deck.configure({...deck.config,mode:'custom'});
+  assert.equal(deck.capture(5).action,'prompt');
+  assert.equal(deck.capture(7).action,'audio_stop');
+});
+
+test('custom audio keys have fixed labels and never dispatch AI answers', () => {
+  const deck = new DeckControls(Array.from({length:7},(_,i)=>['stage'+i,'Stage']));
+  assert.equal(deck.capture(7).action,'stop');
+  deck.configure({...deck.config,mode:'workflow'});
+  assert.equal(deck.capture(7).action,'stage6');
+  deck.configure({...deck.config,mode:'custom'});
+  assert.equal(deck.capture(7).action,'audio_stop');
+  assert.deepEqual([1,2,3,4].map(i=>deck.capture(i).label),['거제야호','오이시','러브어택','대자부']);
+  assert.equal(deck.capture(8).action,'mode');
+  deck.update('terminal',{generation:'g',question:{id:'q',options:Array.from({length:7},(_,i)=>({id:String(i+1),label:'choice'}))}});
+  assert.equal(deck.capture(7).action,'audio_stop');
+  assert.equal(deck.capture(1).action,'board_sound');
+  assert.equal(deck.capture(5).action,'answer');
+  assert.equal(deck.isCurrent(deck.capture(7)),true);
+});
+
+test('MODEL dispatches immediately on the first press for every input source', async () => {
+  const fs = require('node:fs'), vm = require('node:vm');
+  const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
+  const code = source.slice(source.indexOf('async function executeKey('), source.indexOf('async function triggerKey('));
+  for (const origin of ['web', 'Arduino input', 'Arduino echo']) {
+    const sent = [];
+    const deck = { config: { mode: 'agent' }, knobAction: null,
+      isCurrent: () => true, toggleSelection: () => false };
+    const context = { deck, state: {count: 0}, available: () => true,
+      $: () => ({}), animateKey() {}, log() {}, status() {}, setControls() {}, renderProfile() {},
+      sendCommand: async item => sent.push(item.action) };
+    const execute = vm.runInNewContext(code + '\nexecuteKey', context);
+    await execute({slot: 1, label: 'MODEL', action: 'model'}, origin);
+    assert.deepEqual(sent, ['model']);
+    assert.equal(deck.knobAction, 'model');
+    assert.equal(context.state.busy, false);
+  }
+});
+
 test('mode one is the main AI controller and workflow is mode two', () => {
   assert.deepEqual(DECK_MODES, ['agent', 'workflow', 'custom']);
   const deck = new DeckControls([]);
