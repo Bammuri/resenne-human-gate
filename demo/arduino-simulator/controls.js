@@ -62,13 +62,41 @@ function terminalEffort(lines) {
 }
 
 
+// Absolute A0 positions, after the firmware's clockwise-positive conversion.
+// The middle 640 ADC counts contain four equal 160-count effort bands;
+// outside that working range the end levels saturate, never wrap.
+class AnalogLevelSelector {
+  constructor(count, { minimum = 192, maximum = 832, hysteresis = 16, settleMs = 120, dwellMs = 400 } = {}) {
+    this.count = count; this.minimum = minimum; this.maximum = maximum;
+    this.width = (maximum - minimum) / count;
+    this.hysteresis = hysteresis; this.settleMs = settleMs; this.dwellMs = dwellMs;
+    this.candidate = null; this.changedAt = 0; this.lastStepAt = -Infinity;
+  }
+  sample(value, now) {
+    if (!Number.isInteger(value) || value < 0 || value > 1023) return false;
+    let next = this.candidate;
+    if (next === null) next = Math.max(0, Math.min(this.count - 1, Math.floor((value - this.minimum) / this.width)));
+    else {
+      while (next < this.count - 1 && value >= this.minimum + (next + 1) * this.width + this.hysteresis) next++;
+      while (next > 0 && value < this.minimum + next * this.width - this.hysteresis) next--;
+    }
+    if (next !== this.candidate) { this.candidate = next; this.changedAt = now; }
+    return true;
+  }
+  next(current, now) {
+    if (this.candidate === null || this.candidate === current || now - this.changedAt < this.settleMs || now - this.lastStepAt < this.dwellMs) return null;
+    return Math.max(0, Math.min(this.count - 1, current + Math.sign(this.candidate - current)));
+  }
+  committed(now) { this.lastStepAt = now; }
+}
+
 const KNOB_BINDINGS = {
   browse: { label: "SCROLL", hint: "회전: 출력 스크롤 · 누름: 최신 출력", rotate: "scroll", press: "bottom" },
   plan: { label: "PLAN PAGE", hint: "회전: 계획 페이지 탐색 · 누름: 맨 위", rotate: "pages", press: "top" },
   build: { label: "HISTORY", hint: "회전: 입력 기록 탐색 · 누름: 터미널 포커스", rotate: "history", press: "focus" },
   accept: { label: "SELECT", hint: "회전: 선택 항목 이동 · 누름: 확인", rotate: "select", press: "enter" },
   denied: { label: "EDIT CURSOR", hint: "회전: 입력 커서 좌우 이동 · 누름: 취소", rotate: "cursor", press: "escape" },
-  model: { label: "AI EFFORT", hint: "회전: Low / Medium / High / XHigh · 누름: 모델 목록", rotate: "effort", press: "models" },
+  model: { label: "AI EFFORT", hint: "노브 현재 위치: Low → Medium → High → XHigh · 시계방향 증가 · 누름: 모델 목록", rotate: "effort", press: "models" },
   check: { label: "CHECK LOG", hint: "회전: 검증 결과 페이지 탐색 · 누름: 최신 출력", rotate: "pages", press: "bottom" },
   stop: { label: "LOG SCROLL", hint: "회전: 중단 전 로그 탐색 · 누름: 최신 출력", rotate: "scroll", press: "bottom" },
 };
@@ -177,4 +205,4 @@ class DeckControls {
   }
 }
 
-if (typeof module !== "undefined") module.exports = { DeckControls, DECK_MODES, AGENT_KEYS, terminalQuestion, terminalAnswer, terminalMode, terminalEffort, terminalWorking, knobBinding };
+if (typeof module !== "undefined") module.exports = { DeckControls, DECK_MODES, AGENT_KEYS, terminalQuestion, terminalAnswer, terminalMode, terminalEffort, terminalWorking, knobBinding, AnalogLevelSelector };
