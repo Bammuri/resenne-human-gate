@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f3">
+  <title>Button Lab · UNO R4 WiFi</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <script src="/vendor/xterm.js" defer></script>
+  <script src="/vendor/addon-fit.js" defer></script>
+  <script src="/serial.js" defer></script>
+  <script src="/web-terminal.js" defer></script>
+  <script src="/workflow.js" defer></script>
+  <script src="/controls.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <main>
+      <div class="workspace">
+        <div class="main-column">
+        <section class="web-terminal-panel" id="web-terminal" aria-label="웹에서 실행하는 터미널">
+          <div class="output-heading"><div><h2><span class="terminal-icon">›_</span> 웹 터미널</h2><p>Codex · Claude를 실행하고 버튼으로 질문에 답하세요.</p></div><span id="terminal-state" class="output-badge">중지됨</span></div>
+          <div class="terminal-actions">
+            <button data-service="codex" disabled>Codex</button>
+            <button data-service="codex-yolo" disabled>Codex YOLO</button>
+            <button data-service="claude" disabled>Claude</button>
+            <button data-service="claude-yolo" disabled>Claude Bypass permissions</button>
+            <button id="terminal-stop" disabled>종료</button><span class="terminal-session" aria-label="웹 AI 세션">웹 AI <code id="terminal-session-id">대기</code></span></div>
+          <div id="terminal-screen" class="terminal-screen"></div>
+          <div class="terminal-bottom"><form id="terminal-prompt-form" class="terminal-prompt-form" hidden><label for="terminal-prompt">AI에게 요청하기</label><textarea id="terminal-prompt" rows="3" maxlength="8192" placeholder="목표나 작업 내용을 입력하세요. 줄바꿈을 포함해 보낼 수 있습니다."></textarea><button id="terminal-prompt-send" type="submit">요청 보내기</button></form><span id="terminal-workspace">작업 폴더 확인 중</span><span id="terminal-message" role="status">위의 AI 버튼을 눌러 시작하세요</span></div>
+        </section>
+
+        </div>
+
+        <div class="control-column">
+          <section class="control-card board-control-card">
+            <div class="card-heading board-card-heading">
+              <h2 id="board-control-title">아두이노 응답 컨트롤</h2>
+              <button id="deck-profile" class="deck-profile" title="8번 MODE 버튼과 같은 동작">8 MODE · 1 · AI CONTROL</button>
+              <div class="source-tabs" role="tablist" aria-label="버튼 입력원">
+                <button id="source-web" class="selected" role="tab" aria-selected="true">웹</button>
+                <button id="source-hardware" role="tab" aria-selected="false">실물</button>
+              </div>
+            </div>
+            <section class="circuit-panel" aria-label="BindDeck과 UNO R4 WiFi 컨트롤러 시뮬레이터">
+          <div class="panel-top">
+            <span id="board-mode-title" class="board-input-label">웹 입력</span><span id="board-mode-tag" hidden></span>
+            <div class="hardware-box" id="hardware-box" hidden>
+              <select id="hardware-transport" aria-label="보드 연결 방식"><option value="usb">USB</option><option value="wifi">Wi-Fi</option></select>
+              <button id="hardware-connect">USB 연결</button>
+              <button id="hardware-settings-open" aria-haspopup="dialog">연결 설정</button>
+            </div>
+          </div>
+          <div class="circuit-stage" id="circuit-stage">
+            <div class="stage-label"><span>01</span> BINDDECK + ARDUINO</div>
+            <svg class="circuit" viewBox="0 0 760 600" aria-labelledby="circuit-title" role="group">
+              <title id="circuit-title">Arduino 위에 OLED, 8개 키와 로터리 엔코더가 있는 BindDeck을 연결한 가상 회로</title>
+              <defs>
+                <linearGradient id="pcb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#148a88"/><stop offset="1" stop-color="#086765"/></linearGradient>
+                <linearGradient id="metal" x1="0" x2="1"><stop stop-color="#8c969e"/><stop offset="0.45" stop-color="#e7ebed"/><stop offset="1" stop-color="#919da6"/></linearGradient>
+                <linearGradient id="deck-face" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3d4146"/><stop offset="1" stop-color="#171a1d"/></linearGradient>
+                <linearGradient id="deck-edge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#25292d"/><stop offset="1" stop-color="#080a0c"/></linearGradient>
+                <radialGradient id="knob-metal"><stop offset="0" stop-color="#777c81"/><stop offset="0.55" stop-color="#383c40"/><stop offset="1" stop-color="#111315"/></radialGradient>
+                <pattern id="pins" width="18" height="20" patternUnits="userSpaceOnUse"><rect x="5" y="5" width="7" height="9" rx="1" fill="#3a4146"/><rect x="7" y="7" width="3" height="5" fill="#b8a16a"/></pattern>
+                <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="14" stdDeviation="12" flood-opacity="0.3"/></filter>
+              </defs>
+              <path id="yes-wire" d="M432 386V335Q432 318 449 318H485V234" class="wire wire-yes"/>
+              <path id="no-wire" d="M418 386V328Q418 306 440 306H501V234" class="wire wire-no"/>
+              <path d="M404 386V297Q404 286 416 286H516V234" class="deck-bus"/>
+              <text x="530" y="278" class="deck-link-label">D2–D12 · GND</text>
+
+              <g id="binddeck" filter="url(#shadow)" transform="translate(75 4) scale(.92)">
+                <path d="M142 62Q142 42 164 38H584Q606 42 610 62L627 253Q629 271 610 278H145Q127 271 130 253Z" fill="url(#deck-edge)" stroke="#555b60" stroke-width="2"/>
+                <path d="M158 48H579Q595 49 598 65L610 243Q611 255 597 258H157Q143 255 145 242L147 65Q147 51 158 48Z" fill="url(#deck-face)" stroke="#656b70" stroke-width="2"/>
+                <path d="M159 58H582" stroke="#8d9295" stroke-width="1" opacity=".35"/>
+                <text x="335" y="72" class="deck-brand">BINDDECK</text>
+                <g class="deck-oled">
+                  <rect x="171" y="53" width="144" height="80" rx="5" fill="#030b0b" stroke="#6a7171"/>
+                  <svg x="179" y="61" width="128" height="64" viewBox="0 0 128 64" aria-label="128 × 64 OLED 디스플레이">
+                    <rect width="128" height="64" fill="#030b0b"/>
+                    <text id="deck-oled-mode" x="0" y="8">1 AI</text>
+                    <circle id="deck-oled-indicator" cx="122" cy="5" r="3" fill="#90f3cd" visibility="hidden"/>
+                    <text id="deck-oled-stage" x="64" y="32" text-anchor="middle">MODEL</text>
+                    <text id="deck-oled-depth" x="64" y="46" text-anchor="middle">MEDIUM</text>
+                    <text id="deck-oled-status" x="64" y="61" text-anchor="middle">READY</text>
+                  </svg>
+                </g>
+                <g id="deck-key-1" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Codex 시작" data-action="codex" transform="translate(164 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">CODEX</text></g>
+                <g id="deck-key-2" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Codex YOLO 시작" data-action="yolo" transform="translate(270 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">YOLO</text></g>
+                <g id="deck-key-3" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Plan 모드 전환" data-action="plan" transform="translate(376 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">PLAN</text></g>
+                <g id="deck-key-4" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Build 모드 전환" data-action="build" transform="translate(482 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">BUILD</text></g>
+                <g id="deck-key-5" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="터미널 보기" data-action="view" transform="translate(164 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">VIEW</text></g>
+                <g id="deck-key-6" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="터미널 숨기기" data-action="hide" transform="translate(270 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">HIDE</text></g>
+                <g id="deck-key-7" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Accept 응답" data-action="accept" transform="translate(376 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">ACCEPT</text></g>
+                <g id="deck-key-8" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Denied 응답" data-action="denied" transform="translate(482 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">DENIED</text></g>
+                <g id="deck-knob" class="board-button deck-knob" role="button" tabindex="-1" aria-disabled="true" aria-label="BindDeck 노브: 좌우로 선택하고 눌러 전송" transform="translate(518 76)">
+                  <circle class="knob-shadow" cx="36" cy="24" r="31"/><circle class="knob-top" cx="36" cy="16" r="29" fill="url(#knob-metal)"/><path d="M36 -9V1" class="knob-mark"/><text x="-35" y="19">REASON · PUSH</text>
+                </g>
+              </g>
+
+              <g class="arduino-unit" transform="translate(70 305) scale(.86)">
+                <path d="M30 173 H141" class="usb-cable"/><path d="M30 173 H141" class="usb-highlight"/>
+                <g filter="url(#shadow)">
+                  <path d="M166 72 H573 L601 99 V310 L578 333 H167 Q149 333 149 315 V90 Q149 72 166 72Z" fill="url(#pcb)" stroke="#46aaa1" stroke-width="2"/>
+                  <g class="pcb-traces"><path d="M211 127H267V188H338M223 291H276V241H327M542 127V165H503M437 280H480V310M216 217H256V272M318 102V134H352"/><path d="M190 126V148H227M470 93V143H440M565 239H529V271"/></g>
+                  <g fill="#172b2c" stroke="#91b9a3" stroke-width="5"><circle cx="169" cy="93" r="8"/><circle cx="579" cy="108" r="8"/><circle cx="171" cy="311" r="8"/><circle cx="579" cy="310" r="8"/></g>
+                  <rect x="242" y="86" width="288" height="20" rx="3" fill="#141d22"/><rect x="242" y="86" width="288" height="20" fill="url(#pins)"/>
+                  <rect x="246" y="299" width="126" height="20" rx="3" fill="#141d22"/><rect x="246" y="299" width="126" height="20" fill="url(#pins)"/>
+                  <rect x="394" y="299" width="144" height="20" rx="3" fill="#141d22"/><rect x="394" y="299" width="144" height="20" fill="url(#pins)"/>
+                  <g class="pin-labels"><text x="249" y="119">GND</text><text x="395" y="119">12</text><text x="413" y="119">11</text><text x="431" y="119">10</text><text x="449" y="119">9</text><text x="467" y="119">8</text><text x="485" y="119">7</text><text x="503" y="119">6</text><text x="521" y="119">5</text><text x="246" y="290">POWER</text><text x="447" y="290">ANALOG IN</text></g>
+                  <rect x="135" y="153" width="58" height="40" rx="6" fill="url(#metal)" stroke="#627680" stroke-width="2"/><rect x="133" y="161" width="10" height="24" rx="4" fill="#253138"/><path d="M176 158V188M184 158V188" stroke="#838d94"/>
+                  <rect x="144" y="248" width="61" height="44" rx="4" fill="#19242b"/><rect x="140" y="256" width="16" height="28" rx="3" fill="#080f13"/><circle cx="148" cy="270" r="6" fill="#4d585b"/>
+                  <rect x="206" y="145" width="24" height="22" rx="3" fill="#a7b5b2"/><circle cx="218" cy="156" r="7" fill="#c5cbc8"/><text x="205" y="139" class="board-small">RESET</text>
+                  <g transform="translate(292 148)"><rect width="65" height="65" rx="3" fill="#152d31" stroke="#b0b9a2" stroke-width="3"/><path d="M-5 5V60M70 5V60M5 -5H60M5 70H60" stroke="#c2c6b4" stroke-width="5" stroke-dasharray="3 4"/><text x="32" y="28" text-anchor="middle" class="chip-text">RENESAS</text><text x="32" y="42" text-anchor="middle" class="chip-text">RA4M1</text></g>
+                  <rect x="493" y="163" width="67" height="82" rx="3" fill="#c7ccca" stroke="#8eabaa"/><rect x="497" y="167" width="59" height="47" fill="#b2bebb"/><text x="526" y="186" text-anchor="middle" class="module-text">ESP32-S3</text><text x="526" y="199" text-anchor="middle" class="module-text">Wi-Fi / BLE</text><path d="M501 238V220H510V237H519V220H528V237H538V220H549" fill="none" stroke="#667c73" stroke-width="2"/>
+                  <rect x="379" y="153" width="94" height="68" rx="4" fill="#173330"/><g id="led-matrix"></g>
+                  <text x="381" y="241" class="board-title">UNO R4</text><text x="383" y="257" class="board-subtitle">WiFi</text><text x="249" y="257" class="infinity">∞</text>
+                  <circle cx="217" cy="200" r="4" fill="#b8f07a" class="power-led"/><text x="207" y="216" class="board-small">ON</text>
+                  <circle id="tx-led" cx="238" cy="200" r="3" fill="#546d47"/><text x="232" y="216" class="board-small">TX</text>
+                  <g fill="#c6c7a4"><rect x="212" y="234" width="10" height="16" rx="2"/><rect x="230" y="234" width="10" height="16" rx="2"/><rect x="361" y="245" width="7" height="15" rx="1"/></g>
+                </g>
+                <g class="pin-ends"><circle cx="489" cy="96" r="4" fill="#7bdfb4"/><circle cx="471" cy="96" r="4" fill="#eea39a"/><circle cx="254" cy="96" r="4" fill="#77838a"/></g>
+              </g>
+              <text x="522" y="575" class="arduino-caption">ARDUINO UNO R4 WIFI · R3 TEST COMPATIBLE</text>
+            </svg>
+            <div class="stage-footer"><span><i class="tiny-dot"></i> BINDDECK PROFILE</span><span id="stage-hint">7개 기능 버튼 + 8번 MODE</span></div>
+          </div>
+          <p id="knob-help" class="knob-help">회전: 출력 스크롤 · 누름: 최신 출력</p>
+          <div class="signal-path"><span class="path-step active"><b>1</b> 기능 입력</span><span class="path-line"></span><span class="path-step" id="serial-step"><b>2</b> 시리얼 신호</span><span class="path-line"></span><span class="path-step" id="codex-step"><b>3</b> AI 제어</span></div>
+        </section>
+            <div class="board-status-row" id="board-status-row">
+              <div class="response-status" id="response-status" role="status" aria-live="polite"><span class="waiting-dot"></span><span id="response-text">Codex 연결을 확인하고 있어요</span></div>
+              <div class="workflow-shortcuts" id="workflow-shortcuts"><button id="workflow-open" class="text-button">작업 보기</button><button id="workflow-emergency" class="text-button">■ STOP</button><button id="workflow-restore" class="text-button">복귀 미리보기</button><button id="custom-open" class="text-button">커스텀 설정</button><span id="autonomy-hint">1 · 승인 후 구현</span></div>
+              <section id="question-panel" class="question-panel" hidden aria-labelledby="question-heading">
+                <h3 id="question-heading">답변 선택 중</h3><p id="question-prompt"></p>
+                <div id="question-options" class="question-options"></div>
+                <button id="question-selection-send" class="question-selection-send" hidden>선택 완료</button>
+                <div id="question-pagination" class="question-pagination" hidden><button id="question-prev">← 이전 보기</button><span id="question-page"></span><button id="question-next">다음 보기 →</button></div>
+                <form id="question-answer-form" class="question-answer-form"><label for="question-answer">직접 답변 / 기타</label><input id="question-answer" maxlength="8192" autocomplete="off"><button id="question-answer-send" type="submit">답변 보내기</button></form>
+                <p id="question-help"></p>
+              </section>
+            </div>
+          </section>
+
+        </div>
+
+        <aside class="serial-column" aria-label="시리얼 로그">
+          <section class="monitor-card">
+            <div class="card-heading"><h2><span class="terminal-icon">›_</span> 시리얼 모니터</h2><button class="text-button" id="clear-log">지우기</button></div>
+            <div class="monitor-meta"><span><i class="tiny-dot"></i> <span id="serial-source">VIRTUAL SERIAL</span></span><span>115200 baud</span></div>
+            <div class="serial-log" id="serial-log" role="log" aria-label="시리얼 전송 기록" aria-live="polite"></div>
+            <div class="monitor-bottom"><span><b id="event-count">0</b> signals sent</span><span>UTF-8 / LF</span></div>
+          </section>
+        </aside>
+      </div>
+
+      <dialog id="hardware-settings" class="hardware-guide hardware-box" aria-labelledby="hardware-settings-title">
+        <div class="guide-heading"><h2 id="hardware-settings-title">보드 연결 설정</h2><button id="hardware-settings-close" class="guide-close" aria-label="연결 설정 닫기">×</button></div>
+        <div id="wifi-fields" hidden><label>보드 IP<input id="board-ip" value="192.168.4.1" placeholder="OLED의 IP 주소" inputmode="decimal"></label><p>DM 또는 보드와 같은 Wi-Fi에 연결하세요. API 토큰 없이 IP만 사용합니다.</p></div>
+        <p id="hardware-status" role="status">USB 보드를 연결해 주세요.</p>
+        <a id="hardware-guide-link" href="#hardware-guide">배선·업로드 안내</a>
+        <details class="audio-controls"><summary>DFPlayer Pro 음원 제어</summary><button data-audio="toggle">재생 / 일시정지</button><button data-audio="previous">이전</button><button data-audio="next">다음</button><label>음량 (0–30)<input id="audio-volume" type="number" min="0" max="30" value="10"></label><button data-audio="volume">음량 적용</button><label>트랙 번호<input id="audio-track" type="number" min="1" max="9999" value="1"></label><button data-audio="play">트랙 재생</button><button data-audio="status">모듈 상태 확인</button></details>
+      </dialog>
+
+      <dialog class="workflow-dialog" id="workflow-dialog" aria-labelledby="workflow-input-heading">
+        <div class="workflow-input-header"><h2 id="workflow-input-heading">Initialization · 프로젝트 초기화</h2><button id="workflow-input-close" aria-label="입력 창 닫기">×</button></div>
+        <div class="workflow-writing-layout">
+          <section class="workflow-writing-guide" aria-labelledby="workflow-guide-question">
+            <h3 id="workflow-guide-question"></h3>
+            <p class="workflow-guide-label">이 단계에서 입력할 내용</p>
+            <ol id="workflow-guide-inputs"></ol>
+            <p id="workflow-guide-result"></p>
+            <details id="workflow-sample" open>
+              <summary>작성 예시 · 나만의 할 일 목록 웹앱</summary>
+              <p class="workflow-example-note">1–5단계 모두 같은 프로젝트의 이어지는 예시입니다. 내 프로젝트에 맞게 바꿔 작성하세요.</p>
+              <pre id="workflow-sample-text"></pre>
+            </details>
+          </section>
+          <div class="workflow-writing-editor">
+            <label for="workflow-brief">내 프로젝트 입력</label>
+            <p id="workflow-writing-help">‘입력할 내용’의 항목별로 작성하세요. 모르는 내용은 “미정 · AI가 제안해 주세요”라고 적으면 됩니다. 예시는 자동으로 저장되지 않습니다.</p>
+            <textarea id="workflow-brief" maxlength="20000" aria-describedby="workflow-writing-help"></textarea>
+            <p class="workflow-example-note">입력은 자동 저장됩니다. 7 RUN NOW는 노브의 AI 자율성 설정으로 바로 실행합니다. 6 ASK는 단계와 무관한 중간 질문이며 MD에 저장되지 않습니다.</p>
+          </div>
+        </div>
+        <button id="workflow-save">저장</button>
+      </dialog>
+
+      <dialog class="workflow-dialog workflow-chat-dialog" id="workflow-chat-dialog" aria-labelledby="workflow-chat-title">
+        <div class="workflow-input-header"><h2 id="workflow-chat-title">6 ASK · 중간 질문</h2><button id="workflow-chat-close" class="guide-close" aria-label="중간 질문 닫기">×</button></div>
+        <p class="workflow-note">궁금한 것을 자유롭게 물어보세요. 진행 중인 AI-DLC와 별개로 답변하며, 단계 입력이나 MD에 반영하지 않습니다. 대화는 서버 재시작 시 사라집니다.</p>
+        <div id="workflow-chat-messages" role="log" aria-label="중간 질문과 답변" aria-live="polite"></div>
+        <form id="workflow-chat-form"><label for="workflow-chat-question">질문</label><textarea id="workflow-chat-question" maxlength="8192" rows="3" placeholder="예: PWM과 아날로그 출력은 어떻게 다른가요?" required></textarea><button id="workflow-chat-send" type="submit">질문 보내기</button></form>
+        <p id="workflow-chat-status" role="status"></p>
+      </dialog>
+
+      <dialog class="workflow-dialog" id="workflow-review-dialog" aria-labelledby="workflow-title">
+        <div class="workflow-heading"><div><div class="eyebrow">AI-DLC</div><h2 id="workflow-title">1 Initialization · 프로젝트 초기화</h2></div><button id="workflow-close" class="guide-close" aria-label="작업 창 닫기">×</button></div>
+
+        <div class="workflow-steps" id="workflow-steps" aria-label="작업 단계"></div>
+        <div class="workflow-body">
+          <section class="workflow-input-column" aria-label="단계별 입력">
+            <h3 id="workflow-input-title">목표와 범위</h3>
+            <p id="workflow-document-path" class="workflow-document-path" hidden></p>
+            <div id="workflow-fields"></div>
+            <details class="workflow-settings"><summary>설정</summary><div class="workflow-setting"><label for="workflow-autonomy">자율성</label><select id="workflow-autonomy"><option value="0">0 · 수동 — 직접 시작·승인</option><option value="1" selected>1 · 가이드 — 다음 단계 안내</option><option value="2">2 · 단계 전환 — 다음 입력 화면</option><option value="3">3 · 승인형 자동 — 구현 전 승인</option><option value="4">4 · 자동 구현 — AI 승인·구현·검증</option><option value="5">5 · Full Auto — 운영 준비까지</option></select></div></details>
+            <p id="workflow-save-state" class="workflow-note"></p>
+          </section>
+          <section class="workflow-output-column" aria-label="AI 결과와 검토">
+            <details id="workflow-results-panel"><summary>AI 결과 · 검토</summary>
+            <div class="workflow-gate" id="workflow-gate" hidden><p>실행 계획</p><pre id="workflow-plan" class="workflow-result" tabindex="0"></pre><button id="workflow-approve">이 계획 승인·저장</button><span id="workflow-approval">승인 대기</span></div>
+            <div id="workflow-question-slot"></div>
+            <pre id="workflow-result" class="workflow-result" tabindex="0" aria-label="작업 결과"></pre>
+            <details id="workflow-review" hidden open><summary>안전지점 대비 실제 Diff</summary><pre id="workflow-review-diff" class="workflow-result"></pre></details>
+            <details><summary>실행 로그 · 복구</summary><button id="workflow-preview">복구 미리보기</button><pre id="workflow-events" class="workflow-result"></pre></details>
+            <section id="workflow-revert" class="workflow-revert" hidden><h2>마지막 BUILD 직전 안전지점</h2><p>검토한 코드 변경을 되돌립니다. AI-DLC 문서는 유지하며, 복귀 전 현재 파일을 백업합니다.</p><ul id="workflow-changes"></ul><pre id="workflow-diff" class="workflow-result"></pre><button id="workflow-revert-confirm" class="danger-button">변경 내용을 확인했으며 복귀합니다</button></section>
+            </details>
+          </section>
+        </div>
+        <div class="workflow-footer"><div class="workflow-actions"><button id="workflow-ask">6 ASK</button><button id="workflow-run">7 RUN NOW · Initialization</button><button id="workflow-stop" class="danger-button">■ AI 즉시 중단</button></div><p id="workflow-status" role="status" aria-live="polite">이 단계의 입력을 작성하고 MD로 저장해 주세요.</p></div>
+      </dialog>
+
+      <dialog id="custom-dialog" class="workflow-dialog custom-dialog" aria-labelledby="custom-title">
+        <div class="workflow-heading"><div><div class="eyebrow">MODE 3 · CUSTOM</div><h2 id="custom-title">커스텀 버튼 설정</h2></div><button id="custom-close" class="guide-close" aria-label="커스텀 설정 닫기">×</button></div>
+        <p class="workflow-note">버튼 1–7의 이름, 실행 대상과 기능을 저장하세요. 8번 버튼은 항상 MODE입니다. 웹 AI는 실행 중인 Codex·Claude, 기존 Codex는 외부 세션에 메시지를 전달합니다.</p>
+        <form id="custom-form"><div id="custom-entries" class="custom-entries"></div><p id="custom-status" role="status"></p><button id="custom-save" type="submit">7개 버튼 저장</button></form>
+      </dialog>
+
+      <dialog class="hardware-guide" id="hardware-guide" aria-labelledby="hardware-guide-title">
+        <div class="guide-heading"><div><h2 id="hardware-guide-title">Arduino + BindDeck 연결하기</h2><p>UNO R4 WiFi · A0 가변저항 · DFPlayer Pro 구성입니다.</p></div><div class="guide-actions"><a href="/firmware.ino" download="simulator_r4.ino" class="download-link">Arduino 코드 <span>↓</span></a><a href="/board-config.example.h" download="board_config.h" class="download-link">Wi-Fi 설정 헤더 ↓</a><button id="hardware-guide-close" class="guide-close" aria-label="연결 안내 닫기">×</button></div></div>
+        <ol><li><strong>BindDeck 배선</strong><span>키 1–8은 D2–D9와 GND에 순서대로 연결합니다. 버튼은 INPUT_PULLUP이며 A0 가변저항은 5V·와이퍼(A0)·GND에 연결합니다. D0/RX ↔ DFPlayer TX, D1/TX ↔ DFPlayer RX를 연결합니다. D10은 330~470Ω 저항을 거쳐 WS2812B LED 8개의 IN에 연결합니다.</span></li><li><strong>키 기능</strong><span>1–7번은 현재 모드의 기능, 8번(D9)은 MODE입니다. AI 제어 → AI-DLC → 커스텀 순서로 전환합니다. 질문 대기 중 1–7번은 화면의 보기 번호를 선택합니다.</span></li><li><strong>코드 업로드</strong><span>Arduino UNO R4 Boards의 UNO R4 WiFi와 USB 포트를 선택하고 <code>simulator_r4.ino</code>를 업로드합니다.</span></li><li><strong>노브와 연결</strong><span>모드 1에서는 선택한 버튼에 따라 노브 기능이 바뀝니다. MODEL 선택 중에만 추론 강도를 조절합니다. AI-DLC에서는 자율성을 바꿉니다. IDE 시리얼 모니터를 닫고 <b>실물 → USB 보드 연결</b>에서 포트를 선택합니다.</span></li></ol>
+        <p class="guide-note">참조 BindDeck의 ESP32 회로를 그대로 복제하는 것이 아니라, 키·OLED·노브 레이아웃을 Arduino 핀에 맞춘 Button Lab 프로필입니다. USB 또는 Wi-Fi로 연결합니다. 공유기 설정은 보드 설정 페이지에서, 보드 IP는 OLED에서 확인합니다. A0 가변저항에는 누름 기능이 없습니다.</p>
+      </dialog>
+    </main>
+  </div>
+</body>
+</html>
