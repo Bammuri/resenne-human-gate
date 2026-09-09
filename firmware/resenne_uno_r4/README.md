@@ -54,6 +54,10 @@ Claude Code 세션의 승인 프롬프트에 답합니다.
 ## 검증 상태
 
 - **실기기 확인:** 버튼 → WiFi → WebSocket → Node Bridge 왕복(2026-09-07~08), OLED + D3 REJECT 통합.
-- **남은 통합:** Node Bridge ↔ 기존 Python PTY 승인(`server.py`)을 잇는 얇은 어댑터
-  (`HACKATHON_EXECUTION_PLAN.md` §2). `request_id` 에코는 그 어댑터에서 처리.
+- **초기·대체 설계(ws:8080):** 이 펌웨어의 WiFi 경로는 Node Bridge를 전제로 합니다. **Node Bridge 서버 자체는
+  이 저장소에 미커밋**이고, Node Bridge ↔ Python PTY 승인(`server.py`) 어댑터도 남은 통합입니다
+  (`HACKATHON_EXECUTION_PLAN.md` §2, `request_id` 에코는 그 어댑터에서 처리). 따라서 이 경로는 게이트 앱의
+  **초기·대체 설계**로 둡니다.
+- **완결된 UNO R4 WiFi 경로는 `demo/arduino-simulator/`에 있습니다** — `board_wifi.py`가 보드 HTTP API로
+  직결(별도 브리지 불필요)하며, 펌웨어는 `demo/arduino-simulator/firmware/simulator_r4/`입니다.
 - 펌웨어는 이 환경에서 컴파일하지 않았습니다(WSL에 `arduino-cli` 없음). 플래시·온디바이스 확인은 팀이 수행.

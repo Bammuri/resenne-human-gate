@@ -26,9 +26,11 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기면서, 실행 직전
 **Re:senne HUMAN GATE는 실행 승인·거절을 전용 물리 버튼 두 개로 분리합니다.** 개발자는 화면에서 실행
 요청을 확인하고 UNO R4 WiFi의 **✓ 승인(D2)** 또는 **✕ 거절(D3)**을 누릅니다. 제출 버전은 사람의
 물리·웹 시뮬 입력을 **Python PTY 키응답**으로 실제 Claude Code의 대기 중 요청에 전달합니다 —
-**현재 이 저장소에서 바로 실행되는 완성 경로 = USB 시리얼 → PTY 키응답**입니다. **UNO R4 WiFi의
-Node Bridge 경로(버튼→WebSocket→브리지→PTY)는 버튼↔브리지 왕복까지 실기기 확인**했고,
-**브리지↔Python 어댑터 통합이 남은 단계**입니다(아래 [실물 UNO R4 WiFi 연결](#실물-uno-r4-wifi-연결-검증된-별도-경로)).
+**게이트 앱에서 바로 실행되는 완성 경로 = USB 시리얼 → PTY 키응답**입니다. 루트 펌웨어의 **UNO R4 WiFi
+Node Bridge 경로(버튼→WebSocket→브리지→PTY, ws:8080)는 버튼↔브리지 왕복까지 실기기 확인**했으나
+브리지 서버 미커밋·어댑터 미통합으로 **초기·대체 설계**로 둡니다(아래
+[실물 UNO R4 WiFi 연결](#실물-uno-r4-wifi-연결-초기대체-설계-ws8080)). 완결된 WiFi(HTTP 직결)·8키·AI-DLC
+구현은 `demo/arduino-simulator/`입니다.
 
 **`hook_bridge.py`의 PreToolUse allow/deny 게이트 — 코드 통합·단위검증·소프트웨어 E2E 완료(실행 중인
 진짜 `claude`가 결정을 존중하는 라이브 링크는 사람/라이브 데모 몫).** 지정 도구 실행을 버튼 승인까지
@@ -40,8 +42,8 @@ Node Bridge 경로(버튼→WebSocket→브리지→PTY)는 버튼↔브리지 �
 버튼→브리지→Python→실제 Claude 실행 게이트가 확인됐지만, **실행 중인 진짜 `claude`가 그 결정을 존중해
 실제 도구 실행을 allow/deny 하는지는 라이브 세션에서 확인하는 단계(사람 몫)**입니다. 게이트는 프로젝트
 기본 설정이 아니라 **별도 예시 settings로 옵트인 활성화**합니다(아래
-[승인 게이트 활성화](#승인-게이트-활성화-옵트인) 참고). **PTY 키응답 경로가 이 제출의 유일한 *완전* E2E
-검증 경로**이며, 제출 저장소의 `hooks/claude_state_hook.py`는 권한을 결정하지 않는 상태 신호입니다
+[승인 게이트 활성화](#승인-게이트-활성화-옵트인) 참고). **게이트 앱에서는 PTY 키응답 경로가 사람 개입 없이
+*완전* 소프트웨어 E2E로 검증되는 경로**이며, 제출 저장소의 `hooks/claude_state_hook.py`는 권한을 결정하지 않는 상태 신호입니다
 ([Claude 상태 읽기](#claude-상태-읽기-주의) 참고).
 
 매크로패드·스트림덱은 보통 버튼에 단축키·명령을 매핑해 **실행을 촉발**하는 용도로 쓰입니다.
@@ -49,9 +51,14 @@ HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결�
 승인 대기 중인 요청에만·`request_id` 최초 1회만 결정을 전달하는 입력 경로(`terminal.py`의
 `ACTION_KEYS`·`send_choice()`)로 코드에서 확인할 수 있습니다.
 
-설계 범위는 공통 프로토콜과 하네스별 어댑터를 통한 AI 하네스 연동이며, **현재 실기기 E2E로 검증된
-예시는 Claude Code입니다.** 리센느 팀 사진 키캡은 첫 커스텀 프로파일입니다. 포스터의 8키 매크로패드 +
-로터리 다이얼(`AI-DLC DOCKPAD`)은 **확장 로드맵**이며, 이 제출물에는 구현되어 있지 않습니다.
+설계 범위는 공통 프로토콜과 하네스별 어댑터를 통한 AI 하네스 연동이며, **현재 실기기로 검증된
+승인·거절 게이트의 예시는 Claude Code입니다.** 리센느 팀 사진 키캡은 첫 커스텀 프로파일입니다.
+포스터의 8키 컨트롤러 + 로터리 다이얼은 **`demo/arduino-simulator/`에 코드로 구현·커밋**돼 있습니다 —
+버튼 8개(D2–D9)로 실제 Codex·Claude CLI를 PTY에서 구동하고, AI-DLC 5단계(Initialization~Operation)를
+물리 키로 단계별 승인·진행하며 `aidlc-docs/01~05-*.md`에 기록하고, UNO R4 WiFi는 `board_wifi.py`의
+**HTTP 직결**로 붙습니다(별도 브리지 불필요). 이 구현은 **소프트웨어 테스트 116개(Python 76 + JS 40)로
+검증**했으나 **테스트는 가짜 CLI 프로세스를 씁니다** — 실제 Codex·Claude 응답·물리 보드·물리 키를 통한
+AI-DLC 단계 제어는 **팀이 실기기로 확인(사람 검증·시연)**한 것이며 자동 테스트가 증명하지는 않습니다.
 
 ## 실행 방법
 
@@ -76,9 +83,12 @@ python3 server.py --mock                   # claude·하드웨어 없이 승인 
 **환경변수·시크릿 (저장소에 실제 값 없음)**
 - 로컬 웹 실행에는 별도 환경변수가 필요 없습니다. 승인 API는 `127.0.0.1` 접속으로 제한하고, 세션 토큰은
   `compare_digest`로 검증합니다(Host allowlist·Origin·CSP·`X-Frame-Options: DENY` 가드 포함).
-- **현재 완성 경로인 USB 시리얼 연결에는 Wi-Fi 설정이 필요 없습니다.** `WIFI_SSID` / `WIFI_PASS` /
-  `BRIDGE_HOST`는 **통합 예정인 Node Bridge(UNO R4 WiFi) 경로용** 설정이며, 이때만 펌웨어 상단에서
-  **로컬로만** 채웁니다. 저장소에는 **placeholder만 커밋**하고 자격증명·API 키·로그인 정보는 포함하지 않습니다.
+- **HUMAN GATE 게이트 앱의 정본 경로인 USB 시리얼 연결에는 Wi-Fi 설정이 필요 없습니다.** `WIFI_SSID` /
+  `WIFI_PASS` / `BRIDGE_HOST`는 루트 `firmware/resenne_uno_r4/`의 **초기·대체 설계인 Node Bridge(ws:8080)
+  경로용** 설정이며(브리지 서버는 미커밋), 이때만 펌웨어 상단에서 **로컬로만** 채웁니다. 완결된 UNO R4 WiFi
+  경로는 `demo/arduino-simulator/`의 `board_wifi.py` **HTTP 직결**이며, PC 쪽은 보드 IP(+선택 토큰)만
+  입력하고 보드 Wi-Fi 자격증명은 로컬 `wifi_credentials.h`(gitignore)·보드 설정 페이지로만 넣습니다.
+  저장소에는 어느 경로든 **placeholder만 커밋**하고 자격증명·API 키·로그인 정보는 포함하지 않습니다.
 
 **첫 시나리오(핵심 경로 한 줄)**
 `python3 server.py` → 브라우저에서 `http://127.0.0.1:8765` 열기 → **Claude 시작** → 요청 입력 →
@@ -166,7 +176,7 @@ claude --settings hooks/hook-gate.settings.example.json
 
 *아래는 완성도·사용성·유지보수 근거가 되는 상세 문서입니다.*
 
-## 하드웨어 (정본 실행 경로 = USB 시리얼 → PTY · UNO R4 WiFi = 검증된 별도 경로, 통합 예정)
+## 하드웨어 (HUMAN GATE 게이트 앱: 정본 = USB 시리얼 → PTY · UNO R4 WiFi ws:8080 = 초기·대체 설계)
 
 - **지금 이 저장소에서 바로 재현되는 정본 실행 경로 = USB 시리얼 → PTY.** 아래 "동작 방식·시리얼
   규약"이 이 전송을 설명합니다. 펌웨어는 `firmware/binddeck_claude/`(BindDeck ESP32 매크로패드,
@@ -174,15 +184,20 @@ claude --settings hooks/hook-gate.settings.example.json
   같은 경로를 재현할 수 있습니다.
 - **팀이 제작한 제출 디바이스 = Arduino UNO R4 WiFi** + 128×64 SSD1306 OLED + 물리 버튼 2개
   (✓ **APPROVE** = D2, ✕ **REJECT** = D3). 펌웨어 = **`firmware/resenne_uno_r4/`**.
-- UNO R4 WiFi의 전송 경로 = 버튼 → UNO R4 WiFi(2.4GHz) → WebSocket → Node Bridge(`ws://…:8080`)
-  → 앱의 PTY 승인 seam. **버튼→브리지 왕복은 실기기에서 검증**했고(2026-09-07~08, 30ms 디바운스 21회
-  클린), OLED·D3 버튼도 팀 버튼 테스트 스케치로 확인한 뒤 이 펌웨어에 통합했습니다. 다만 **Node Bridge ↔
-  Python(PTY) 어댑터 연결은 통합이 남은 단계**입니다(`HACKATHON_EXECUTION_PLAN.md` §2). 즉 UNO R4 WiFi는
-  **검증된 별도 경로이며, 위 USB 시리얼 정본 경로와 같은 PTY 승인 seam으로 합류할 예정**입니다.
+- 루트 게이트 펌웨어(`firmware/resenne_uno_r4/`)의 UNO R4 WiFi 전송 경로 = 버튼 → UNO R4 WiFi(2.4GHz) →
+  WebSocket → Node Bridge(`ws://…:8080`) → 앱의 PTY 승인 seam. **버튼→브리지 왕복은 실기기에서 검증**했고
+  (2026-09-07~08, 30ms 디바운스 21회 클린), OLED·D3 버튼도 팀 버튼 테스트 스케치로 확인한 뒤 이 펌웨어에
+  통합했습니다. 다만 이 ws:8080 경로의 **Node Bridge 서버 자체는 미커밋이고 Node Bridge ↔ Python(PTY)
+  어댑터 연결도 남은 단계**이므로(`HACKATHON_EXECUTION_PLAN.md` §2), 이 경로는 **초기·대체 설계**로 둡니다.
+- **완결된 UNO R4 WiFi 구현은 `demo/arduino-simulator/`에 있습니다** — `board_wifi.py`가 보드 HTTP API
+  (`/status`·`/events`·`/command`, 사설 IPv4만)로 **직결**하므로 별도 브리지가 필요 없습니다. 이 앱은 8키
+  AI 컨트롤러(실제 Codex·Claude를 PTY에서 구동 + AI-DLC 5단계 물리 키 제어)로, **소프트웨어 테스트 116개
+  (Python 76 + JS 40)로 검증**했으나 **테스트는 가짜 CLI를 씁니다.** 실제 Codex·Claude 응답·물리 보드·AI-DLC 단계
+  제어는 **팀이 실기기로 확인(사람 검증·시연)**했습니다. 펌웨어 = `demo/arduino-simulator/firmware/simulator_r4/`.
 
 > ⚠️ 이전 문서 일부는 최종 HW를 BindDeck ESP32로 적었으나, 팀이 제작한 제출 디바이스는 **UNO R4 WiFi**입니다.
-> 다만 지금 저장소에서 **바로 재현되는 실행 경로는 USB 시리얼 → PTY**이고, UNO R4 WiFi의 WiFi(Node Bridge)
-> 경로는 통합이 남은 단계입니다.
+> 게이트 앱에서 **바로 재현되는 실행 경로는 USB 시리얼 → PTY**이고, 그 앱의 ws:8080 Node Bridge 경로는
+> 초기·대체 설계입니다. 완결된 WiFi(HTTP 직결) + 8키·AI-DLC 구현은 `demo/arduino-simulator/`에 있습니다.
 
 ## 동작 방식 (요약)
 
@@ -227,7 +242,7 @@ Claude 세션이 앱 소유 PTY에서 실행 중일 때만 버튼이 활성화�
 
 이 시뮬레이션은 버튼·시리얼 동작을 재현합니다. ESP32 CPU나 펌웨어 실행을 에뮬레이션하지는 않습니다.
 
-## 실물 UNO R4 WiFi 연결 (검증된 별도 경로)
+## 실물 UNO R4 WiFi 연결 (초기·대체 설계, ws:8080)
 
 준비물: Arduino UNO R4 WiFi, 128×64 SSD1306 OLED(I2C), 물리 버튼 2개, USB 케이블, 2.4GHz AP.
 
@@ -245,9 +260,11 @@ OLED 상태 표기(펌웨어 실제 문구): IDLE=`READY`, RUNNING=`AI'S TURN`,
 **REVIEW_REQUIRED=`YOUR TURN` / `PRESS TO APPROVE` / `OR PRESS X REJECT`**, SUCCESS=`DONE`,
 ERROR=`ERROR`, DISCONNECTED=`OFFLINE`. 자동 승인은 꺼져 있어 **사람이 눌러야만** 진행합니다.
 
-> **검증 상태:** 버튼→WiFi→WebSocket→Node Bridge 왕복은 실기기 확인. Node Bridge ↔ 기존 Python PTY
-> 승인 처리(`server.py`)를 잇는 어댑터는 통합 남은 작업입니다(`HACKATHON_EXECUTION_PLAN.md` §2).
-> 현재 이 저장소에서 바로 실행되는 완성 경로는 아래 **USB 시리얼(BindDeck)** 연결입니다.
+> **검증 상태:** 버튼→WiFi→WebSocket→Node Bridge 왕복은 실기기 확인. 다만 **Node Bridge 서버 자체가
+> 미커밋**이고 Node Bridge ↔ Python PTY 승인(`server.py`) 어댑터도 통합 남은 작업이라
+> (`HACKATHON_EXECUTION_PLAN.md` §2), 이 ws:8080 경로는 **초기·대체 설계**입니다. 게이트 앱에서 바로
+> 실행되는 완성 경로는 아래 **USB 시리얼(BindDeck)** 연결이고, **완결된 UNO R4 WiFi(HTTP 직결) 구현은
+> `demo/arduino-simulator/`**(`board_wifi.py`, 펌웨어 `firmware/simulator_r4/`)입니다.
 
 ## 실물 BindDeck 연결 (정본 실행 경로 · USB 시리얼)
 
@@ -309,8 +326,13 @@ python3 -m venv .venv && ./.venv/bin/pip install hypothesis
 - USB 테스트는 가상 Web Serial 스트림을 사용합니다.
 - 속성 기반 테스트(PBT): 순수 매핑 함수의 전체성/일관성을 검증합니다
   (`tests/mapping.pbt.test.js`, `tests/test_mapping_pbt.py`).
-- **아직 하지 않은 것**: 실물 BindDeck 업로드·배선·버튼 작동, 실제 `claude` 세션에 대한 키 시퀀스 스모크
-  테스트. `ACTION_KEYS`의 리터럴 바이트는 설정값이므로, 스모크 테스트 결과에 따라 로직 변경 없이 조정할 수 있습니다.
+- **8키·AI-DLC 구현(`demo/arduino-simulator/`)의 테스트**: `python3 -m unittest discover -s tests`(76개)와
+  `node --test tests/*.test.js`(40개) = **116개 통과**(2026-09-09). 다만 이 테스트는 **가짜 CLI 프로세스**로
+  질문·승인 프로토콜·세션 변경·커스텀 저장을 검증하며, **실제 Codex·Claude 응답이나 실물 보드를 대체하지 않습니다.**
+- **자동 테스트가 증명하지 않는 것(= 사람 검증·시연 몫)**: 실물 보드 업로드·배선·버튼 작동, 실행 중인 진짜
+  `claude`가 결정을 존중하는 라이브 링크, 물리 키를 통한 실제 Codex·Claude·AI-DLC 단계 제어. **이 부분은
+  팀이 실기기로 확인**했으며(사람 검증), 무편집 시연 영상으로 뒷받침합니다(§시연에 제출 전 첨부). `ACTION_KEYS`의
+  리터럴 바이트는 설정값이므로 스모크 결과에 따라 로직 변경 없이 조정할 수 있습니다.
 
 빌드·테스트 상세 절차는 `aidlc-docs/construction/build-and-test/`를 참고하세요.
 
