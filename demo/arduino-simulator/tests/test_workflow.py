@@ -161,6 +161,34 @@ class WorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "보류"):
             self.flow.start("construction", immediate=True)
 
+    @patch.object(Workflow, "command", return_value=[sys.executable, "-c", FAKE_CODEX])
+    def test_run_now_uses_current_brief_from_any_stage_without_requiring_ideation(self, command):
+        for stage in ("initialization", "ideation", "inception", "construction", "operation"):
+            with self.subTest(stage=stage):
+                self.flow = Workflow("fake-codex", self.root)
+                self.flow.inputs = {key: {} for key in self.flow.inputs}
+                self.flow.configure("", 0)
+                brief = f"{stage}: app.txt를 구현하고 검사해 주세요."
+                self.flow.configure(None, 0, stage, {"brief": brief})
+                self.flow.start("construction", immediate=True)
+                self.wait()
+                self.assertFalse(self.flow.error, self.flow.error)
+                self.assertIn(brief, self.flow.run_requirements)
+                self.assertIn(brief, self.flow.prompt("construction"))
+                self.assertIn("construction", self.flow.results)
+                self.assertEqual((self.root / "app.txt").read_text(), "built")
+                self.assertEqual(self.flow.autonomy, 0)
+                self.flow.configure(None, 0, stage, {"brief": ""})
+                with self.assertRaisesRegex(ValueError, "먼저 입력"):
+                    self.flow.start("construction", immediate=True)
+
+    def test_run_now_rejects_empty_inputs_and_does_not_treat_decisions_as_a_goal(self):
+        self.flow.configure("", 0)
+        self.flow.inputs = {key: {"decision": "pending"} for key in self.flow.inputs}
+        with self.assertRaisesRegex(ValueError, "먼저 입력"):
+            self.flow.start("construction", immediate=True)
+        self.assertFalse(self.flow.running)
+
     def test_checkpoint_changes_preview_stale_guard_and_backup(self):
         cp = self.flow.checkpoints
         cp.capture(signature(cp.inventory()))

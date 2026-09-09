@@ -203,6 +203,7 @@ class Workflow:
         self.side_question = SideQuestion(codex, self.workspace)
         self.direct_run = False
         self.direct_target = ""
+        self.run_requirements = ""
 
     def persist(self):
         self.documents.save(self.inputs, self.results, self.plan, self.requirements, self.autonomy)
@@ -342,7 +343,7 @@ class Workflow:
                 + ("현재 " + stage + " 단계의 입력과 이전 결과를 읽고 모호함·누락·상충하는 결정만 사용자에게 질문하라. "
                    "질문이 필요 없으면 없다고 명시하라. 질문만 작성하고 구현·테스트 실행·단계 진행은 하지 말라."
                    if self.question_only else INSTRUCTIONS[stage])
-                + (" 추가 회귀·경계 조건 검사까지 수행하라." if stage == "construction" and self.autonomy >= 3 and not self.question_only else "") + "\n\n요구사항/목표 및 질문 답변:\n" + self.requirements
+                + (" 추가 회귀·경계 조건 검사까지 수행하라." if stage == "construction" and self.autonomy >= 3 and not self.question_only else "") + "\n\n요구사항/목표 및 질문 답변:\n" + (self.run_requirements if self.direct_run else self.requirements)
                 + "\n\n단계별 사용자 입력 (현재 단계: " + stage + "):\n" + json.dumps(inputs, ensure_ascii=False)
                 + ("\n\n화면에서만 유지하는 ASK 답변:\n" + self.ask_answers.get(stage, "") if self.question_only else "")
                 + "\n\n단계 입력을 구분해서 사용하고 요구사항 → 작업 단위 → 검증 결과의 대응을 기록하라. "
@@ -369,6 +370,14 @@ class Workflow:
                 raise ValueError("지원하지 않는 단계이거나 Codex CLI가 없습니다.")
             self.direct_run = bool(immediate and not question_only)
             self.direct_target = stage
+            self.run_requirements = self.requirements
+            if self.direct_run and stage == "construction" and not self.run_requirements.strip():
+                # RUN NOW can use a brief entered in any phase. Keep this run's
+                # context separate so later edits cannot reuse a stale goal.
+                self.run_requirements = "\n\n".join(
+                    f"{key.upper()} · {label}:\n{self.inputs[key].get(field, '').strip()}"
+                    for key in STAGES for field, label, _ in SCHEMA[key][2]
+                    if field != "decision" and self.inputs[key].get(field, "").strip())
             self.gate_message = ""
             self.question_only = question_only
             if question_only:
@@ -387,8 +396,8 @@ class Workflow:
                 self.questions, self.events = [], []
                 threading.Thread(target=self.run, args=(stage,), daemon=True).start()
                 return self.snapshot()
-            if (stage != "initialization" or self.autonomy >= 3) and not self.requirements.strip():
-                raise ValueError("2 IDEATION에서 무엇을 왜 만드는지 먼저 입력하고 저장해 주세요.")
+            if (stage != "initialization" or self.autonomy >= 3) and not self.run_requirements.strip():
+                raise ValueError("만들거나 수정할 내용을 먼저 입력해 주세요.")
             gate = self.human_gate(stage)
             if gate: raise ValueError(gate)
             if self.autonomy >= 4 or self.direct_run:
