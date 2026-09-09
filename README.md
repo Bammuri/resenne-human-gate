@@ -57,7 +57,7 @@ HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결�
 버튼 8개(D2–D9)로 실제 Codex·Claude CLI를 PTY에서 구동하고, AI-DLC 5단계(Initialization~Operation)를
 물리 키로 단계별 승인·진행하며, 각 단계의 입력과 AI 결과를 **실행 시점에** `aidlc-docs/01-initialization.md`~
 `05-operation.md` **런타임 산출물**로 저장합니다(실제 세션에서 생성되므로 저장소에는 미포함). UNO R4 WiFi는
-`board_wifi.py`의 **HTTP 직결**로 붙습니다(별도 브리지 불필요). 이 구현은 **소프트웨어 테스트 116개(Python 76 + JS 40)로
+`board_wifi.py`의 **HTTP 직결**로 붙습니다(별도 브리지 불필요). 이 구현은 **소프트웨어 테스트로
 검증**했으나 **테스트는 가짜 CLI 프로세스를 씁니다** — 실제 Codex·Claude 응답·물리 보드·물리 키를 통한
 AI-DLC 단계 제어는 **팀이 실기기로 확인(사람 검증·시연)**한 것이며 자동 테스트가 증명하지는 않습니다. **이 8키 앱은
 팀의 다른 구성원이 개발한 별도 앱**입니다(루트 HUMAN GATE 게이트 앱과 코드베이스 분리 — 사용법은
@@ -192,14 +192,13 @@ claude --settings hooks/hook-gate.settings.example.json
   어댑터 연결도 남은 단계**이므로(`HACKATHON_EXECUTION_PLAN.md` §2), 이 경로는 **초기·대체 설계**로 둡니다.
 - **완결된 UNO R4 WiFi 구현은 `demo/arduino-simulator/`에 있습니다** — `board_wifi.py`가 보드 HTTP API
   (`/status`·`/events`·`/command`, 사설 IPv4만)로 **직결**하므로 별도 브리지가 필요 없습니다. 이 앱은 8키
-  AI 컨트롤러(실제 Codex·Claude를 PTY에서 구동 + AI-DLC 5단계 물리 키 제어)로, **소프트웨어 테스트 116개
-  (Python 76 + JS 40)로 검증**했으나 **테스트는 가짜 CLI를 씁니다.** 실제 Codex·Claude 응답·물리 보드·AI-DLC 단계
+  AI 컨트롤러(실제 Codex·Claude를 PTY에서 구동 + AI-DLC 5단계 물리 키 제어)로, **소프트웨어 테스트로 검증**했으나 **테스트는 가짜 CLI를 씁니다.** 실제 Codex·Claude 응답·물리 보드·AI-DLC 단계
   제어는 **팀이 실기기로 확인(사람 검증·시연)**했습니다. 펌웨어 = `demo/arduino-simulator/firmware/simulator_r4/`.
 - **같은 물리 보드의 두 번째 펌웨어 = Re:senne 음원 플레이어**(`demo/arduino-simulator/firmware/uno_r4_soundboard/`,
   팀 하드웨어·펌웨어 담당 개발). D2–D9로 Re:senne 음원(오이쉬·거제야호·러브어택·데자뷰)을 **DFPlayer Pro**로
   재생하고 A0=볼륨·D10 WS2812B LED로 상태를 표시합니다. **AI 신호 프로토콜(`/events`·`BUTTON_LAB_*`)은
   구현하지 않는 별도 스케치**로, AI 컨트롤러(`simulator_r4`)와 **같은 배선을 공유하되 올리는 펌웨어만** 다릅니다
-  (부품 연결도 = [`uno_r4_soundboard/WIRING.md`](./demo/arduino-simulator/firmware/uno_r4_soundboard/WIRING.md)).
+  (부품 연결도 = [`uno_r4_soundboard/README.md` §배선과 조작](./demo/arduino-simulator/firmware/uno_r4_soundboard/README.md)).
   커밋된 펌웨어는 **D10 LED를 구동**하며, HW 담당자의 최신 통합 작업본은 **LED 통합이 진행 중**(미커밋)이라 두
   버전을 모두 남겼습니다. **컴파일 성공은 실물 검증을 뜻하지 않습니다.**
 
@@ -334,8 +333,8 @@ python3 -m venv .venv && ./.venv/bin/pip install hypothesis
 - USB 테스트는 가상 Web Serial 스트림을 사용합니다.
 - 속성 기반 테스트(PBT): 순수 매핑 함수의 전체성/일관성을 검증합니다
   (`tests/mapping.pbt.test.js`, `tests/test_mapping_pbt.py`).
-- **8키·AI-DLC 구현(`demo/arduino-simulator/`)의 테스트**: `python3 -m unittest discover -s tests`(76개)와
-  `node --test tests/*.test.js`(40개) = **116개 통과**(2026-09-09). 다만 이 테스트는 **가짜 CLI 프로세스**로
+- **8키·AI-DLC 구현(`demo/arduino-simulator/`)의 테스트**: `python3 -m unittest discover -s tests`와
+  `node --test tests/*.test.js`로 실행합니다. 다만 이 테스트는 **가짜 CLI 프로세스**로
   질문·승인 프로토콜·세션 변경·커스텀 저장을 검증하며, **실제 Codex·Claude 응답이나 실물 보드를 대체하지 않습니다.**
 - **자동 테스트가 증명하지 않는 것(= 사람 검증·시연 몫)**: 실물 보드 업로드·배선·버튼 작동, 실행 중인 진짜
   `claude`가 결정을 존중하는 라이브 링크, 물리 키를 통한 실제 Codex·Claude·AI-DLC 단계 제어. **이 부분은
