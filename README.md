@@ -55,10 +55,13 @@ HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결�
 승인·거절 게이트의 예시는 Claude Code입니다.** 리센느 팀 사진 키캡은 첫 커스텀 프로파일입니다.
 포스터의 8키 컨트롤러 + 로터리 다이얼은 **`demo/arduino-simulator/`에 코드로 구현·커밋**돼 있습니다 —
 버튼 8개(D2–D9)로 실제 Codex·Claude CLI를 PTY에서 구동하고, AI-DLC 5단계(Initialization~Operation)를
-물리 키로 단계별 승인·진행하며 `aidlc-docs/01~05-*.md`에 기록하고, UNO R4 WiFi는 `board_wifi.py`의
-**HTTP 직결**로 붙습니다(별도 브리지 불필요). 이 구현은 **소프트웨어 테스트 116개(Python 76 + JS 40)로
+물리 키로 단계별 승인·진행하며, 각 단계의 입력과 AI 결과를 **실행 시점에** `aidlc-docs/01-initialization.md`~
+`05-operation.md` **런타임 산출물**로 저장하고(실제 세션에서 생성되므로 저장소에는 미포함), UNO R4 WiFi는
+`board_wifi.py`의 **HTTP 직결**로 붙습니다(별도 브리지 불필요). 이 구현은 **소프트웨어 테스트 116개(Python 76 + JS 40)로
 검증**했으나 **테스트는 가짜 CLI 프로세스를 씁니다** — 실제 Codex·Claude 응답·물리 보드·물리 키를 통한
-AI-DLC 단계 제어는 **팀이 실기기로 확인(사람 검증·시연)**한 것이며 자동 테스트가 증명하지는 않습니다.
+AI-DLC 단계 제어는 **팀이 실기기로 확인(사람 검증·시연)**한 것이며 자동 테스트가 증명하지는 않습니다. **이 8키 앱은
+팀의 다른 구성원이 개발한 별도 앱**입니다(루트 HUMAN GATE 게이트 앱과 코드베이스 분리 — 사용법은
+[`demo/arduino-simulator/README.md`](./demo/arduino-simulator/README.md)).
 
 ## 실행 방법
 
@@ -155,6 +158,7 @@ claude --settings hooks/hook-gate.settings.example.json
 | _(제출 전 기입)_ | 하드웨어·펌웨어 (UNO R4 WiFi, OLED, 물리 버튼, 배선) |
 | _(제출 전 기입)_ | 소프트웨어 (서버·웹 터미널·PTY 승인 경로·테스트) |
 | _(제출 전 기입)_ | 기획·AI-DLC (문제 정의·컨셉·산출물 정합) |
+| _(제출 전 기입)_ | 8키 AI-DLC 컨트롤러 앱 개발 (`demo/arduino-simulator/` — Codex·Claude PTY 제어·AI-DLC 5단계·WiFi HTTP 직결) |
 
 > 표의 이름·역할·인원은 실제 팀 구성에 맞춰 제출 전 채워 주세요.
 
