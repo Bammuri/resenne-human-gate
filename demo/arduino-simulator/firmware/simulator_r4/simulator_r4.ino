@@ -149,7 +149,11 @@ void serviceButtonAudio() {
   sendAudio(audioPendingCommand);
 }
 bool processCommand(const String& command) {
-  if (command == "BUTTON_LAB_HELLO") { emitLine(READY); return true; }
+  if (command == "BUTTON_LAB_HELLO") {
+    emitLine(READY);
+    if(bootComplete)emitLine("BUTTON_LAB_POT_RESET:"+String(potFiltered));
+    return true;
+  }
   if (command == "boot:info") { emitLine("BUTTON_LAB_BOOT:"+String(bootStage));return true; }
   if (command == "oled:info") { reportOled();return true; }
   if (command == "oled:refresh") { oledForce=true;oledDirty=true;return true; }

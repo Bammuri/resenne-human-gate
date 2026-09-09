@@ -8,7 +8,7 @@ let workflow = null, oledTimer = null, lastOled = "", pendingKey = null, pending
 let configSaving = false, configLoaded = false, questionsPolling = false;
 let questionRenderKey = "", questionInputKey = "", potContext = "";
 let potPosition = null, potAnchor = null;
-let potDirection = 0, potReverseTimer = null;
+let potLevels = null, potLevelTimer = null, potLevelInFlight = false;
 const state = { source: "web", target: "terminal", serverOnline: false, session: null,
   busy: false, serialBusy: false, effort: "medium", count: 0, timer: null, terminalThread: "", terminalReady: false };
 
@@ -182,6 +182,7 @@ function renderProfile() {
   $("#knob-help").textContent = binding.hint;
   $("#stage-hint").textContent = deck.question ? "답변 우선 · 1–7 선택 / 8 MODE" : deck.config.mode === "workflow" ? "Initialization → Ideation → Inception → Construction → Operation · 6 ASK · 7 RUN NOW" : deck.config.mode === "agent" ? "1 MODEL · 2 PLAN · 3 BUILD · 4 CHECK · 5 ACCEPT · 6 DENIED · 7 STOP" : "커스텀 설정에서 버튼의 기능을 저장하세요";
   updateOled(); setControls();
+  if (potPosition !== null && potContext !== knobIdentity()) applyPot(potPosition);
 }
 async function saveConfig(config) {
   if (configSaving) throw new Error("모드 설정을 저장하고 있습니다.");
@@ -278,16 +279,17 @@ $("#question-selection-send").onclick = () => {
   if (deck.selected.size) executeKey(deck.captureAnswer({ choice: Array.from(deck.selected) }), "web");
 };
 async function applyEffort(effort, source) {
-  if (!EFFORTS.includes(effort) || state.busy || deck.question) return;
+  if (!EFFORTS.includes(effort) || state.busy || deck.question) return false;
   const binding = knobBinding(deck.config.mode, deck.knobAction, deck.question);
   if (binding.rotate === "autonomy") return workflow.setAutonomy(EFFORTS.indexOf(effort));
-  if (binding.rotate !== "effort") return;
+  if (binding.rotate !== "effort") return false;
   state.busy = true; setControls();
   try {
     await browserTerminal.setEffort(effort, state.effort);
     state.effort = effort; updateOled(); log("KNOB", `${effort.toUpperCase()} · ${source}`);
     status(`추론 강도: ${effort.toUpperCase()}`);
-  } catch (error) { status(error.message, "error"); }
+    return true;
+  } catch (error) { status(error.message, "error"); return false; }
   finally { state.busy = false; setControls(); }
 }
 function knobIdentity() { return JSON.stringify([deck.config.mode, deck.knobAction, deck.identity(), state.source]); }
@@ -341,44 +343,56 @@ function refreshTarget() {
   $("#terminal-session-id").title = state.terminalThread || "";
   renderProfile();
 }
-function applyPot(value, reverseConfirmed = false) {
+function cancelPotLevels() {
+  clearTimeout(potLevelTimer); potLevelTimer=null; potLevels=null;
+}
+function schedulePotLevels() {
+  if (potLevelTimer !== null) return;
+  potLevelTimer=setTimeout(() => { potLevelTimer=null; flushPotLevels(); }, 50);
+}
+async function flushPotLevels() {
+  const selector=potLevels, identity=potContext;
+  if (!selector || identity!==knobIdentity() || state.source!=="hardware" || serialBridge.state!=="connected") return;
+  const binding=knobBinding(deck.config.mode,deck.knobAction,deck.question);
+  if (!["effort","autonomy"].includes(binding.rotate)) return;
+  if (binding.rotate==="autonomy" && workflow.data.running) return;
+  // Retain the newest absolute position while an asynchronous command is busy.
+  if (potLevelInFlight || state.busy || state.serialBusy || browserTerminal.nativePending || (binding.rotate==="autonomy" && workflow.pending)) {
+    schedulePotLevels();return;
+  }
+  const current=binding.rotate==="effort"?EFFORTS.indexOf(state.effort):workflow.data.autonomy;
+  if (selector.candidate===current) return;
+  const next=selector.next(current,performance.now());
+  if (next===null) { schedulePotLevels();return; }
+  potLevelInFlight=true;
+  let applied=false;
+  try {
+    if (binding.rotate==="autonomy") { await workflow.setAutonomy(next);applied=workflow.data.autonomy===next; }
+    else applied=await applyEffort(EFFORTS[next],"A0 위치");
+  } catch (error) { status(error.message,"error"); }
+  finally { potLevelInFlight=false; }
+  if (selector!==potLevels || identity!==knobIdentity()) return;
+  // Do not retry rejected terminal commands indefinitely. A new sample can retry.
+  if (!applied) { clearTimeout(potLevelTimer);potLevelTimer=null;return; }
+  selector.committed(performance.now());
+  if (selector.candidate!==next) schedulePotLevels();
+}
+function applyPot(value) {
   if (!Number.isInteger(value) || value < 0 || value > 1023 || state.source !== "hardware") return;
-  clearTimeout(potReverseTimer); potReverseTimer = null;
   potPosition = value;
   const identity = knobIdentity();
-  // Custom-mode analog volume is applied locally by the firmware, not the AI.
-  if (deck.config.mode === "custom") { potAnchor=value;potContext=identity;potDirection=0;return; }
-  if (potContext !== identity || potAnchor === null) { potContext=identity;potAnchor=value;potDirection=0;return; }
-  if (state.busy || state.serialBusy || browserTerminal.nativePending) { potAnchor=value;return; }
-  const delta=value-potAnchor;
+  if (potContext!==identity) { cancelPotLevels();potContext=identity;potAnchor=value; }
   const binding=knobBinding(deck.config.mode,deck.knobAction,deck.question);
+  // Volume remains entirely on the board; navigation remains relative.
+  if (deck.config.mode==="custom") { cancelPotLevels();potAnchor=value;return; }
   if (binding.rotate === "effort" || binding.rotate === "autonomy") {
-    // Relative steps use any working part of the knob's travel. Firmware already
-    // smooths ADC readings; this dead band rejects small jitter, and one event
-    // can change at most one level even if a worn contact produces a large jump.
-    const direction = Math.sign(delta);
-    const reversing = potDirection !== 0 && direction !== potDirection;
-    if (Math.abs(delta)<(reversing?72:48)) return;
-    // A worn contact may briefly bounce backwards. Confirm a reversal only
-    // after it holds steady; continuing rotation still uses the short step.
-    if (reversing && !reverseConfirmed) {
-      potReverseTimer = setTimeout(() => {
-        if (potContext === identity && knobIdentity() === identity && potPosition === value)
-          applyPot(value, true);
-      }, 80);
-      return;
-    }
-    potAnchor=value;
-    potDirection=direction;
     const count=binding.rotate === "autonomy" ? AUTONOMY.length : EFFORTS.length;
-    const current=binding.rotate === "effort" ? EFFORTS.indexOf(state.effort) : workflow.data.autonomy;
-    // Saturate at both ends. Never wrap highest -> lowest or lowest -> highest.
-    const next=Math.max(0,Math.min(count-1,current+direction));
-    if (next!==current) {
-      if (binding.rotate === "autonomy") workflow.setAutonomy(next);
-      else applyEffort(EFFORTS[next],"A0");
-    }
+    if (!potLevels) potLevels=new AnalogLevelSelector(count);
+    potLevels.sample(value,performance.now());schedulePotLevels();
   } else {
+    cancelPotLevels();
+    if (potAnchor===null || state.busy || state.serialBusy || browserTerminal.nativePending) { potAnchor=value;return; }
+    const delta=value-potAnchor;
     if (Math.abs(delta)<24) return;
     potAnchor=value;
     useKnob(delta>0?"right":"left","hardware");
@@ -388,8 +402,8 @@ const boardCallbacks = {
   onKey: (slot, origin) => triggerKey(slot, origin),
   onPot: value => applyPot(value),
   onPotReset: value => {
-    clearTimeout(potReverseTimer);potReverseTimer=null;
-    potPosition=value;potAnchor=null;potDirection=0;potContext="";
+    cancelPotLevels();potPosition=value;potAnchor=value;potContext="";
+    applyPot(value);
   },
   onKnob: (value, origin) => useKnob(value, origin),
   onEffort: (effort, origin) => { if (state.source !== "hardware" || state.serialBusy) return; lastOled = ""; applyEffort(effort, origin); },
@@ -400,7 +414,7 @@ const boardCallbacks = {
     const transport=serialBridge.isWifi?"Wi-Fi":"USB";
     $("#hardware-connect").textContent = connection === "connected" ? `${transport} 연결 해제` : `${transport} 연결`;
     $("#hardware-transport").disabled = connection === "connected" || ["connecting","syncing","disconnecting"].includes(connection);
-    if (connection !== "connected") { potContext="";potAnchor=null; }
+    if (connection !== "connected") { cancelPotLevels();potContext="";potAnchor=null;potPosition=null; }
     const transitioning = ["connecting", "syncing", "disconnecting"].includes(connection);
     $("#hardware-connect").disabled = transitioning || connection === "unsupported";
     $("#source-web").disabled = transitioning; $("#source-hardware").disabled = transitioning;
