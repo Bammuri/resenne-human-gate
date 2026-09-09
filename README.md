@@ -187,7 +187,17 @@ claude --settings hooks/hook-gate.settings.example.json
 유지합니다(`vendor/xterm-LICENSE`, `vendor/addon-fit-LICENSE`). 이 라이선스는 물리 하드웨어 설계나
 팀 사진 키캡 이미지의 권리까지 보장하지는 않습니다. **라이선스는 팀 최종 sign-off 대기 상태입니다.**
 
-## 시연 (스크린샷)
+## 시연 (영상·스크린샷)
+
+**시연 영상**
+
+[▶ 무편집 시연 영상 — screenshots/demo.mp4](screenshots/demo.mp4)
+
+팀이 **실기기로 촬영한 무편집 시연 영상**입니다. 화면과 물리 키 조작을 담았으며, **사람이 실기기로
+확인한 검증·시연 결과이고 자동 테스트가 증명하지 않습니다.** GitHub README에서는 인라인 재생 대신
+파일 링크로 열리므로, 저장소에서 내려받아 재생하십시오.
+
+**스크린샷**
 
 아래는 **DOCKPAD(8키 AI 컨트롤러, `demo/arduino-simulator/`)를 실기기로 시연한 화면**입니다.
 실제 Claude Code(v2.1.266 · Opus 4.8)를 PTY에서 구동하고 **물리 키 입력(USB 시리얼)**으로
@@ -214,8 +224,9 @@ AI-DLC 단계와 승인·거절을 전달합니다. 이 컷들은 루트 2버튼
 | ![ACCEPT](screenshots/dockpad-05-accept.png) | ![DENIED](screenshots/dockpad-06-denied.png) | ![STOP](screenshots/dockpad-07-stop.png) |
 | 검증 결과 앞에서 AI가 사람을 기다리면 ACCEPT 키로 결과를 승인해 진행합니다. | DENIED 키로 현재 제안을 거절하고 다른 대안을 요청합니다(해당 제안 미채택). | STOP 키로 진행 중인 작업을 중단합니다. |
 
-> 루트 2버튼 게이트 앱의 **① 승인 대기 → ② 승인 후 실행 → ③ 거절 후 해당 요청 미실행** PTY
-> 키응답 경로를 담은 무편집 시연 영상은 별도 증거로 제출 전 이 절에 추가합니다.
+> 위 **시연 영상**은 팀이 실기기로 확인한 시연 근거입니다(사람 검증·시연). 루트 2버튼 게이트 앱의
+> **① 승인 대기 → ② 승인 후 실행 → ③ 거절 후 해당 요청 미실행** PTY 키응답 경로는 위 **구현과 검증
+> 범위** 표와 아래 상세 절에 정리했습니다.
 
 ---
 
