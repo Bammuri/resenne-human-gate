@@ -155,3 +155,27 @@ The following raw user inputs were received (in order) during the session that l
 **Context**: 제4회 디디톤 마감(9/9 17:00) 당일. 검증된 게이트 위에 AI-DLC 두 번째 증분(유닛 `approval-gate`) — 결정 감사 로그(RESILIENCY-05 준수 근거)+최근 결정 뷰. 결정이 흔적 없이 사라지는 갭 해소, 라이브-claude 주장과 무관하게 정직. astra evolve 자문 프롬프트 = `/home/hj/.claude/jobs/fc63d226/tmp/astra_evolve_prompt.md`, 판정 = B. curl 스모크 스크립트 = `tmp/gate_log_smoke.py`. worktree branch `broker-import`. auto-proceed per Request B.
 
 ---
+
+## Session Continuity — 이전 세션 재개 (Welcome Back)
+**Timestamp**: 2026-09-09T12:30:00Z
+**User Input**: "이전에 진행한 세션 찾아서 이어해보자"
+**AI Response**: "`.aidlc-rule-details/` 규칙 디렉터리 확인 후 `common/session-continuity.md` 로드, `aidlc-docs/aidlc-state.md` 파싱. 현재 상태 재확인: Phase=CONSTRUCTION, Build & Test 완료, OPERATIONS=플레이스홀더(범위 밖). git 트리 클린(추적 대상 변경 없음, `.claude/worktrees/`만 미추적) — 게이트 유닛 `approval-gate`의 증분 1(브로커 통합, 73aaf03)·SW-E2E+브라우저 패널(a6890a1)·증분 2 결정 감사 로그(3d8fc81)까지 모두 main에 커밋됨. **테스트 실측 재검증: 77 passed(Python 54 via .venv unittest + JS 23 via node --test tests/*.test.js), 0 fail** — 상태 문서와 정확히 일치. AI-DLC 워크플로우는 자연 완료 지점. 남은 항목은 사람/라이브 몫(실행 중 실제 claude가 게이트 permissionDecision 존중하는지 라이브 확인, Node Bridge↔PTY 어댑터 통합, 실기기 버튼 전체경로 확인, 무편집 데모영상+히어로컷, 팀원 실명·LICENSE sign-off). 정직 경계 유지(PTY 키응답 경로 = 유일 *완전* E2E 검증 경로). 사용자에게 상태 요약 제시 후 다음 작업 방향을 확인(auto-proceed 아님 — 명시 승인 대기)."
+**Context**: 세션 재개. 이전 세션이 자연 완료 지점에서 끝나 pending AI-DLC 스테이지 없음. 다음 행동은 사용자 결정 사항이므로 상태 제시 후 방향 질의.
+
+---
+
+## README 팀원 표 실명 기입 (사람 몫 항목 완료)
+**Timestamp**: 2026-09-09T12:45:00Z
+**User Input**: "4명이고 1 이호섭 2. 신현준  3. 팀원 모두 이호섭 안중용 김판규 신현준 4. 안중용"
+**AI Response**: "README.md `## 팀` 표(4개 역할)의 `_(제출 전 기입)_` 플레이스홀더를 사용자가 제공한 실제 팀원 실명으로 채우고 '표의 이름·역할·인원은 실제 팀 구성에 맞춰 제출 전 채워 주세요.' 안내문 제거. 매핑: ①HW·펌웨어=이호섭, ②소프트웨어=신현준, ③기획·AI-DLC=이호섭·안중용·김판규·신현준(팀원 전원), ④8키 AI-DLC 컨트롤러 앱=안중용. 팀=4인(이호섭·신현준·안중용·김판규). 이름은 사용자 제공값 그대로 기입(임의 생성 없음). NOTICE의 저작권 표기는 'Re:senne (리센느) team' 단체명 유지(개별 실명 저작권 표기는 사용자 요청 시에만 — 이번 요청 범위=README). 코드·테스트 변경 없음 → 77 테스트 회귀 없음. 커밋은 사용자 승인 시에만."
+**Context**: 제출 최종 점검 세션 중 'README에 사람(팀원) 업데이트' 하위작업. 사람 몫으로 남아있던 '팀원 실명 기입' 항목 해소. 정직수위 유지(실명=사용자 제공, 미검증 주장 추가 없음).
+
+---
+
+## README 팀 표 3행 재구성 + 정직수위 정합 수정 (A·B, 3개 문서)
+**Timestamp**: 2026-09-09T13:10:00Z
+**User Input**: "그리고 표를 1 HW 2 SW 3 기획으로 하고 2 SW 를 안중용 신현준으로 하자 나머진 다 그대로" / (직전 AskUserQuestion 답) 정직수위="3개 문서 모두 정합 수정 (권장)", 커밋="정직수위 수정까지 함께 커밋 (권장)"(main, push 없음)
+**AI Response**: "① **README `## 팀` 표를 4행→3행으로 재구성**: (1) HW=이호섭(그대로), (2) SW=**안중용 · 신현준**(신현준→안중용·신현준), (3) 기획·AI-DLC=이호섭·안중용·김판규·신현준(팀원 전원, 그대로). 기존 4행째 '8키 AI-DLC 컨트롤러 앱=안중용' 행은 사용자 지시('표를 1 HW 2 SW 3 기획으로')대로 표에서 제거(8키 앱 서술은 README `## 해결 방법`·`## 하드웨어` 본문에 그대로 유지). ② **정직수위 과장 2건(A·B)을 README·CONCEPT_FINAL·HACKATHON_EXECUTION_PLAN 3개 문서에서 각 문서의 자체 정확 서술(‘PTY 키응답 = 유일 *완전* E2E 검증 경로’, ‘UNO R4 WiFi 브리지 체인은 버튼→브리지 왕복까지 실기기 확인·어댑터는 통합 남은 단계’, ‘게이트 = 코드 통합·단위·SW E2E / 라이브 claude 존중은 사람 몫’)에 맞춰 정합화** — 새 주장 추가가 아니라 각 문서 내부의 정직한 문단을 과장 지점에 전파(정합 수정). **수정 A(‘버튼→브리지→Python→진짜 Claude 실행’ 전체 체인을 실기기 E2E 검증됨/검증 완료로 표현한 곳 → ‘버튼→브리지 왕복까지 실기기 확인, 어댑터는 남은 단계; 완전 E2E = PTY 키응답’으로 하향):** README L4(‘실기기로 검증된 예시’→‘검증된 예시’), README L41-42(‘버튼→브리지→Python→실제 Claude 실행 게이트가 확인됐지만’→‘버튼→브리지 왕복까지 확인됐지만(어댑터 연결은 통합 남은 단계)’), CONCEPT_FINAL §0.5 L30(‘(경로 B, 팀 실기기)’→‘완전 E2E 근거=PTY 키응답; 브리지 체인은 버튼→브리지 왕복까지 실기기 확인, 어댑터는 남은 단계’), CONCEPT_FINAL §1 L49(‘경로 B가 팀 실기기 E2E로 검증됨: …진짜 Claude Code 실행까지 왕복’→‘완전 E2E 검증 경로=PTY 키응답(웹 입력·USB 시리얼 버튼): …진짜 Claude Code 실행까지; UNO R4 WiFi 브리지 체인은 버튼→브리지 왕복까지 실기기 확인, 어댑터는 통합 남은 단계’), CONCEPT_FINAL §1 L52(‘검증 주체=팀 실기기 E2E로 명시’→‘검증 주체=제출 저장소에서 재현되는 PTY 키응답 경로(완전 E2E)로 명시’, 기록 목록에서 ‘브리지’ 제거), PLAN 상단 L8(‘경로 B…가 팀 실기기 E2E로 검증됨’→‘경로 B…는 버튼→브리지 왕복까지 실기기 확인 — 완전 E2E 검증 경로는 PTY 키응답’), PLAN §2 L118(‘경로 B…는 팀 실기기 E2E로 검증 완료다’→‘…는 버튼→브리지 왕복까지 실기기 확인했고, 어댑터 연결은 통합 남은 단계다’), PLAN §0.6 L69(README L41-42와 동일 문구 → 동일 수정; grep으로 발견), PLAN §8 L256(‘검증된 경로 B를 제출 repo 시작 명령으로 재현’→‘완전 E2E 검증 경로(PTY 키응답)를 제출 repo 시작 명령으로 재현’). **수정 B(‘실기기로 검증된 게이트’→‘(코드 통합·단위·소프트웨어 E2E로) 검증된’):** README L54-55(‘현재 실기기로 검증된 승인·거절 게이트의 예시는 Claude Code’→‘현재 검증된(코드 통합·단위·소프트웨어 E2E) 승인·거절 게이트의 예시는 Claude Code’). **검증:** `grep -nE '팀 실기기 E2E로 검증|E2E로 검증 완료|검증된 경로 B|실기기로 검증된|Python→실제 Claude 실행 게이트가 확인'` 3개 문서에서 잔여 0건(clean). 코드·테스트 변경 없음 → 77 테스트 회귀 없음. **하지 않은 것:** 포지셔닝·캐치프레이즈(‘물리 버튼으로 실제 Claude Code 실행을 승인·거절한다’ 등 §0.5·§1 L50)는 PTY/USB 시리얼 경로로 방어 가능하므로 유지(승인 범위=검증-상태 과장 2건 A·B), demo/arduino-simulator 8키 앱의 116/76/40 테스트 수치·모델명·프로토콜 식별자는 실제값이므로 불변, aidlc-state.md 등 프로세스 문서 불변. ③ 팀 표 재구성 + A·B 수정 + 팀원 실명 기입을 **main에 함께 커밋(push 없음)**."
+**Context**: 제출 최종 점검(마감 9/9 17:00 당일). AskUserQuestion 승인(3개 문서 정합 수정 + 함께 커밋). 정직수위 2층 규율 유지 — 확인된 것만 주장, 각 문서 자체 정직 서술로 과장 지점 정합화, push는 명시 승인 없어 보류(로컬 main 커밋만).
+
+---
