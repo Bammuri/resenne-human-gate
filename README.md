@@ -4,6 +4,8 @@
 >
 > 실행 앞에, 사람. — 제4회 디디톤 출품작 · 팀 리센느(Re:senne)
 
+**소개 페이지: [bammuri.github.io/resenne-landing](https://bammuri.github.io/resenne-landing/)**
+
 Re:senne HUMAN GATE는 AI 하네스의 **대기 중 실행 요청에 사람이 물리 버튼으로 승인·거절을 전달하는
 소스 공개 컨트롤러**입니다. 키보드로 작업을 지시하고, 실행 직전의 판단은 전용 버튼으로 분리합니다.
 검증된 하네스 예시는 **Claude Code**입니다. 브라우저에서 쉘과 Claude를 실행하는 웹 터미널,

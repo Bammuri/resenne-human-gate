@@ -195,3 +195,11 @@ The following raw user inputs were received (in order) during the session that l
 **Context**: 제출 최종 점검(마감 9/9 17:00 당일). 사용자 지시(랜딩 톤 참고 + gpt-6-astra low로 윤문 + 커밋). 정직수위 2층 규율 — 윤문은 gpt-6-astra가 수행하되 정직 경계는 하드 제약으로 걸고, 커밋 전 내가 diff 전문·경로를 직접 감사(확인된 것만 통과). DOCKPAD 실물 서술은 구현·커밋 근거로 정당(사용자 정정 반영). push는 명시 승인 없어 보류(로컬 main 커밋만).
 
 ---
+
+## 배포된 랜딩 페이지 링크를 README 상단에 추가
+**Timestamp**: 2026-09-09T15:52:00Z
+**User Input**: "https://bammuri.github.io/resenne-landing/ 실제 landing page거든 readme에도 넣어줄래?"
+**AI Response**: "**WebFetch로 URL 도달·정체 확인**(200 응답, 'Re:senne HUMAN GATE' 랜딩 페이지 — 리센느·HUMAN GATE·DOCKPAD 언급 확인) 후 README 상단 태그라인 blockquote 바로 아래에 **소개 페이지: [bammuri.github.io/resenne-landing](https://bammuri.github.io/resenne-landing/)** 한 줄 추가. 외부 배포 페이지로의 포인터일 뿐 README 본문에 새 주장·수치를 넣지 않음(정직 경계 무관). 다른 문서·본문 불변, 코드·테스트 불변. README.md + 이 audit 엔트리를 main에 함께 커밋(push 없음)."
+**Context**: 제출 최종 점검(마감 9/9 17:00 당일). 사용자 지시(실제 랜딩 페이지 링크 추가). 링크 추가 전 대상 도달 확인 규율 유지(WebFetch). push는 명시 승인 없어 보류.
+
+---
