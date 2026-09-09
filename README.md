@@ -198,6 +198,13 @@ claude --settings hooks/hook-gate.settings.example.json
   AI 컨트롤러(실제 Codex·Claude를 PTY에서 구동 + AI-DLC 5단계 물리 키 제어)로, **소프트웨어 테스트 116개
   (Python 76 + JS 40)로 검증**했으나 **테스트는 가짜 CLI를 씁니다.** 실제 Codex·Claude 응답·물리 보드·AI-DLC 단계
   제어는 **팀이 실기기로 확인(사람 검증·시연)**했습니다. 펌웨어 = `demo/arduino-simulator/firmware/simulator_r4/`.
+- **같은 물리 보드의 두 번째 펌웨어 = Re:senne 음원 플레이어**(`demo/arduino-simulator/firmware/uno_r4_soundboard/`,
+  팀 하드웨어·펌웨어 담당 개발). D2–D9로 Re:senne 음원(오이쉬·거제야호·러브어택·데자뷰)을 **DFPlayer Pro**로
+  재생하고 A0=볼륨·D10 WS2812B LED로 상태를 표시합니다. **AI 신호 프로토콜(`/events`·`BUTTON_LAB_*`)은
+  구현하지 않는 별도 스케치**로, AI 컨트롤러(`simulator_r4`)와 **같은 배선을 공유하되 올리는 펌웨어만** 다릅니다
+  (부품 연결도 = [`uno_r4_soundboard/WIRING.md`](./demo/arduino-simulator/firmware/uno_r4_soundboard/WIRING.md)).
+  커밋된 펌웨어는 **D10 LED를 구동**하며, HW 담당자의 최신 통합 작업본은 **LED 통합이 진행 중**(미커밋)이라 두
+  버전을 모두 남겼습니다. **컴파일 성공은 실물 검증을 뜻하지 않습니다.**
 
 > ⚠️ 이전 문서 일부는 최종 HW를 BindDeck ESP32로 적었으나, 팀이 제작한 제출 디바이스는 **UNO R4 WiFi**입니다.
 > 게이트 앱에서 **바로 재현되는 실행 경로는 USB 시리얼 → PTY**이고, 그 앱의 ws:8080 Node Bridge 경로는
