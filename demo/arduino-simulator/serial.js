@@ -103,7 +103,7 @@ class ButtonSerial {
     return this.sendCommand("action", action, `action:${action}`);
   }
   async sendAudio(command) {
-    const mapping = { "audio:toggle": "AT+PLAY=PP", "audio:next": "AT+PLAY=NEXT", "audio:previous": "AT+PLAY=LAST", "audio:status": "AT+QUERY=5" };
+    const mapping = { "audio:stop": "AT+AMP=OFF", "audio:toggle": "AT+PLAY=PP", "audio:next": "AT+PLAY=NEXT", "audio:previous": "AT+PLAY=LAST", "audio:status": "AT" };
     let expected = mapping[command];
     if (/^audio:volume:\d+$/.test(command) && Number(command.split(":")[2]) <= 30) expected = `AT+VOL=${Number(command.split(":")[2])}`;
     if (/^audio:play:\d+$/.test(command) && Number(command.split(":")[2]) >= 1 && Number(command.split(":")[2]) <= 9999) expected = `AT+PLAYNUM=${Number(command.split(":")[2])}`;
@@ -167,6 +167,9 @@ class ButtonSerial {
       } else if (this.state === "connected" && line.startsWith("BUTTON_LAB_ACTION:")) {
         const action = line.slice("BUTTON_LAB_ACTION:".length);
         if (["codex", "yolo", "plan", "build", "view", "hide", "accept", "denied"].includes(action)) this.callbacks.onAction?.(action, "hardware");
+      } else if (this.state === "connected" && /^BUTTON_LAB_POT_RESET:\d{1,4}$/.test(line)) {
+        const value = Number(line.split(":")[1]);
+        if (value <= 1023) this.callbacks.onPotReset?.(value);
       } else if (this.state === "connected" && /^BUTTON_LAB_POT:\d{1,4}$/.test(line)) {
         const value = Number(line.split(":")[1]);
         if (value <= 1023) this.callbacks.onPot?.(value, "hardware");
@@ -258,6 +261,7 @@ class ButtonWifi extends ButtonSerial {
         if (this.state !== "connected") break;
         const line = event.line;
         if (/^BUTTON_LAB_KEY:[1-8]$/.test(line)) this.notifyKey(Number(line.split(":")[1]), "hardware");
+        else if (/^BUTTON_LAB_POT_RESET:\d{1,4}$/.test(line) && Number(line.split(":")[1]) <= 1023) this.callbacks.onPotReset?.(Number(line.split(":")[1]));
         else if (/^BUTTON_LAB_POT:\d{1,4}$/.test(line) && Number(line.split(":")[1]) <= 1023) this.callbacks.onPot?.(Number(line.split(":")[1]), "hardware");
         else if (/^BUTTON_LAB_SIMULATED_KEY:[1-8]$/.test(line)) { const n = Number(line.split(":")[1]); if (this.settleCommand("key", n)) this.notifyKey(n, "simulator"); }
         else if (line === "BUTTON_LAB_SIMULATED_MODE:toggle") { if (this.settleCommand("key", 8)) this.notifyKey(8, "simulator"); }

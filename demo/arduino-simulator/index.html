@@ -79,13 +79,13 @@
                 <text x="335" y="72" class="deck-brand">BINDDECK</text>
                 <g class="deck-oled">
                   <rect x="171" y="53" width="144" height="80" rx="5" fill="#030b0b" stroke="#6a7171"/>
-                  <svg x="179" y="61" width="128" height="64" viewBox="0 0 128 64" aria-label="128 × 64 OLED 디스플레이">
+                  <svg x="179" y="61" width="128" height="64" viewBox="0 0 128 64" overflow="hidden" aria-label="128 × 64 OLED 디스플레이">
                     <rect width="128" height="64" fill="#030b0b"/>
-                    <text id="deck-oled-mode" x="0" y="8">1 AI</text>
+                    <text id="deck-oled-mode" x="2" y="8">1 AI</text>
                     <circle id="deck-oled-indicator" cx="122" cy="5" r="3" fill="#90f3cd" visibility="hidden"/>
-                    <text id="deck-oled-stage" x="64" y="32" text-anchor="middle">MODEL</text>
-                    <text id="deck-oled-depth" x="64" y="46" text-anchor="middle">MEDIUM</text>
-                    <text id="deck-oled-status" x="64" y="61" text-anchor="middle">READY</text>
+                    <text id="deck-oled-stage" x="2" y="24">MODEL</text>
+                    <text id="deck-oled-depth" x="2" y="40">MEDIUM</text>
+                    <text id="deck-oled-status" x="2" y="56">READY</text>
                   </svg>
                 </g>
                 <g id="deck-key-1" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Codex 시작" data-action="codex" transform="translate(164 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">CODEX</text></g>
@@ -159,7 +159,7 @@
 
       <dialog id="hardware-settings" class="hardware-guide hardware-box" aria-labelledby="hardware-settings-title">
         <div class="guide-heading"><h2 id="hardware-settings-title">보드 연결 설정</h2><button id="hardware-settings-close" class="guide-close" aria-label="연결 설정 닫기">×</button></div>
-        <div id="wifi-fields" hidden><label>보드 IP<input id="board-ip" value="192.168.4.1" placeholder="OLED의 IP 주소" inputmode="decimal"></label><p>DM 또는 보드와 같은 Wi-Fi에 연결하세요. API 토큰 없이 IP만 사용합니다.</p></div>
+        <div id="wifi-fields" hidden><label>보드 IP<input id="board-ip" value="192.168.137.79" placeholder="OLED의 IP 주소" inputmode="decimal"></label><p>보드와 같은 Wi-Fi(NUCBOX_K11 8684)에 연결하세요. API 토큰 없이 IP만 사용합니다.</p></div>
         <p id="hardware-status" role="status">USB 보드를 연결해 주세요.</p>
         <a id="hardware-guide-link" href="#hardware-guide">배선·업로드 안내</a>
         <details class="audio-controls"><summary>DFPlayer Pro 음원 제어</summary><button data-audio="toggle">재생 / 일시정지</button><button data-audio="previous">이전</button><button data-audio="next">다음</button><label>음량 (0–30)<input id="audio-volume" type="number" min="0" max="30" value="10"></label><button data-audio="volume">음량 적용</button><label>트랙 번호<input id="audio-track" type="number" min="1" max="9999" value="1"></label><button data-audio="play">트랙 재생</button><button data-audio="status">모듈 상태 확인</button></details>
