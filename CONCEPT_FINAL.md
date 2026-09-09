@@ -65,7 +65,7 @@
 ### 근거가 되는 두 실제 트랙 (베이퍼웨어 아님)
 | 트랙 | 위치 | 메커니즘 | 상태 |
 |---|---|---|---|
-| 범용/리센느 커스텀 | 제출 repo `server.py`·`hooks/hook_bridge.py`·`gate.html`/`gate.js` | PreToolUse hook로 Claude 도구 실행을 정지 + 브라우저/버튼 승인 패널 | **코드 통합+단위검증+SW E2E**(subprocess·curl) · 라이브 `claude` 존중 = 사람 몫 (완전 E2E 근거 = PTY 경로) |
+| 범용/리센느 커스텀 | 제출 repo `server.py`·`hooks/hook_bridge.py`·`gate.html`/`gate.js` | PreToolUse hook로 Claude 도구 실행을 정지 + 브라우저/버튼 승인 패널 + 결정 감사 로그(`/api/approval/log`) | **코드 통합+단위검증+SW E2E**(subprocess·curl) · 라이브 `claude` 존중 = 사람 몫 (완전 E2E 근거 = PTY 경로) |
 | AI-DLC 방향 | `arduino-simulator-aidlc/` | PTY 키스트로크(ACTION_KEYS) | **적용 로드맵**(§3) |
 
 ---
@@ -122,7 +122,7 @@
 
 ## 7. 확정 후 남은 작업 (게이트됨 — 별도 지시로 착수)
 
-1. **B-검증 PoC 임포트:** ✅ allow/deny 게이트(승인 브로커 + `hooks/hook_bridge.py`)를 제출 repo로 **코드 통합·단위검증·소프트웨어 E2E 완료**(2026-09-09, 옵트인 예시 settings, `terminal.py`·프로젝트 `.claude/settings.json` 불변). 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 테스트 3개 + 실서버 curl 스모크로 검증, **브라우저 승인 패널 `/gate.html`**(별도 페이지, PTY 데모 불변) 추가. **실행 중인 진짜 `claude`가 결정을 존중해 실제 실행을 allow/deny 하는 라이브 링크는 미검증(사람/라이브 데모 몫)**, PTY 키응답이 유일 완전 E2E 경로. Node Bridge↔Python(PTY) 어댑터 실행법 통합은 여전히 남은 작업(§2). README/PLAN/컨셉 문서를 이 시제로 정합화 완료. 설계 = `aidlc-docs/construction/approval-gate/design.md`.
+1. **B-검증 PoC 임포트:** ✅ allow/deny 게이트(승인 브로커 + `hooks/hook_bridge.py`)를 제출 repo로 **코드 통합·단위검증·소프트웨어 E2E 완료**(2026-09-09, 옵트인 예시 settings, `terminal.py`·프로젝트 `.claude/settings.json` 불변). 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 테스트 3개 + 실서버 curl 스모크로 검증, **브라우저 승인 패널 `/gate.html`**(별도 페이지, PTY 데모 불변) 추가. **실행 중인 진짜 `claude`가 결정을 존중해 실제 실행을 allow/deny 하는 라이브 링크는 미검증(사람/라이브 데모 몫)**, PTY 키응답이 유일 완전 E2E 경로. Node Bridge↔Python(PTY) 어댑터 실행법 통합은 여전히 남은 작업(§2). **결정 감사 로그 증분(2026-09-09):** 처리된 결정만 `.claude/approval-log.jsonl`(0600·웹루트 밖·gitignore)에 `tool_name·input_hash·decision·role·시각`만 기록(summary·tool_input·토큰 제외) + 최근 결정 뷰(`GET /api/approval/log`, ui/device만). `role`=자격증명 역할일 뿐 신원·물리버튼·실행결과 증명 아님, 기록 실패 시 결정 미전달(fail-safe ask). README/PLAN/컨셉 문서를 이 시제로 정합화 완료. 설계 = `aidlc-docs/construction/approval-gate/design.md`.
 2. **라이선스 명시:** ✅ 루트 `LICENSE`(Apache-2.0) + `NOTICE` 추가(2026-09-08). **팀 최종 sign-off 대기.** 제3자 vendor 라이선스 동봉 확인, 미해결 라이선스 코드 배포 제외 원칙 유지.
 3. **재현·안전 확인:** 중복/지연/대기없음/연결끊김 + 거절=미실행 3회.
 4. **미디어:** 무편집 B 영상(오늘 밤 확보) + 히어로 컷 + 증거 스샷 2.

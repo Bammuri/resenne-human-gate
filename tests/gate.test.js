@@ -1,14 +1,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { GateApi, describePending, initGatePanel } = require('../gate.js');
+const { GateApi, describePending, describeDecision, initGatePanel } = require('../gate.js');
 
-// --- pure helper -----------------------------------------------------------
+// --- pure helpers ----------------------------------------------------------
 
 test('describePending combines tool and summary, tolerates missing fields', () => {
   assert.equal(describePending({ tool_name: 'Bash', summary: 'rm -rf x' }), 'Bash — rm -rf x');
   assert.equal(describePending({ tool_name: 'Write' }), 'Write');
   assert.equal(describePending({}), 'tool');
   assert.equal(describePending(null), 'tool');
+});
+
+test('describeDecision shows tool, verdict, role and hash, tolerates missing fields', () => {
+  assert.match(describeDecision({ tool_name: 'Bash', decision: 'allow', role: 'ui', input_hash: 'abc123' }),
+    /^Bash — 허용 \(ui\).*#abc123$/);
+  assert.match(describeDecision({ tool_name: 'Write', decision: 'deny', role: 'device' }),
+    /^Write — 거부 \(device\)$/);
+  assert.equal(describeDecision({}), 'tool — ? (?)');
+  assert.equal(describeDecision(null), 'tool — ? (?)');
 });
 
 // --- network layer (fake fetch models the already-tested broker endpoints) --
@@ -70,6 +79,21 @@ test('resolve posts approval_id and decision, surfaces 409 conflicts', async () 
   assert.equal(status, 409);
 });
 
+test('listLog sends the token header and returns recent decisions', async () => {
+  const fetchImpl = fakeFetch({
+    '/api/session': () => ({ status: 200, body: { token: 'T0K' } }),
+    '/api/approval/log': (opts) => {
+      assert.equal(opts.headers['X-Simulator-Token'], 'T0K');
+      return { status: 200, body: { decisions: [{ tool_name: 'Bash', decision: 'allow', role: 'ui' }], count: 1 } };
+    },
+  });
+  const api = new GateApi(fetchImpl);
+  await api.connect();
+  const { status, body } = await api.listLog();
+  assert.equal(status, 200);
+  assert.equal(body.decisions[0].role, 'ui');
+});
+
 // --- DOM wiring (minimal fake document) ------------------------------------
 
 function fakeElement(tag) {
@@ -83,7 +107,10 @@ function fakeElement(tag) {
 }
 
 function fakeDoc() {
-  const nodes = { 'gate-list': fakeElement('ul'), 'gate-status': fakeElement('div'), 'gate-empty': fakeElement('p') };
+  const nodes = {
+    'gate-list': fakeElement('ul'), 'gate-status': fakeElement('div'), 'gate-empty': fakeElement('p'),
+    'gate-log': fakeElement('ul'), 'gate-log-empty': fakeElement('p'),
+  };
   return {
     nodes,
     getElementById: (id) => nodes[id],
@@ -119,4 +146,27 @@ test('poll on an empty list shows the empty notice', async () => {
   await panel.poll();
   assert.equal(doc.nodes['gate-empty'].hidden, false);
   assert.equal(doc.nodes['gate-list'].children.length, 0);
+});
+
+test('pollLog renders recent decisions and marks deny rows, hides empty', async () => {
+  const doc = fakeDoc();
+  const api = { listLog: async () => ({ status: 200, body: { decisions: [
+    { tool_name: 'Bash', decision: 'allow', role: 'ui', input_hash: 'abc' },
+    { tool_name: 'Write', decision: 'deny', role: 'device' },
+  ] } }) };
+  const panel = initGatePanel(doc, api);
+  await panel.pollLog();
+  assert.equal(doc.nodes['gate-log-empty'].hidden, true);
+  assert.equal(doc.nodes['gate-log'].children.length, 2);
+  assert.equal(doc.nodes['gate-log'].children[0].className, 'gate-log-allow');
+  assert.equal(doc.nodes['gate-log'].children[1].className, 'gate-log-deny');
+});
+
+test('pollLog on an empty log shows its empty notice', async () => {
+  const doc = fakeDoc();
+  const api = { listLog: async () => ({ status: 200, body: { decisions: [] } }) };
+  const panel = initGatePanel(doc, api);
+  await panel.pollLog();
+  assert.equal(doc.nodes['gate-log-empty'].hidden, false);
+  assert.equal(doc.nodes['gate-log'].children.length, 0);
 });

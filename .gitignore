@@ -9,6 +9,9 @@ node_modules/
 # Runtime state written by the Claude hooks (not source)
 .claude/binddeck-state.json
 .claude/binddeck-state.json.tmp
+# Runtime decision audit log written by the approval broker (not source)
+.claude/approval-log.jsonl
+.claude/approval-log.jsonl.tmp
 .hypothesis/
 
 # WSL/Windows metadata (NTFS alternate data streams materialized as files in WSL)

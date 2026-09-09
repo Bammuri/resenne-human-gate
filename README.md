@@ -111,6 +111,14 @@ claude --settings hooks/hook-gate.settings.example.json
 **별도 페이지**입니다(검증된 키응답 경로에 영향 없음). 실물 device 어댑터 대신 하드웨어 없이 게이트를
 시연·검증하는 데 쓸 수 있습니다.
 
+**결정 감사 로그 + 최근 결정 뷰.** 처리된(허용/거부) 결정은 `.claude/approval-log.jsonl`(mode `0600`,
+정적 웹루트 밖, `.gitignore`)에 **결정을 전달하기 전에 먼저 기록**됩니다. 기록 항목은
+`tool_name·input_hash·decision·role·created_at·resolved_at`뿐이고 **summary·전체 tool_input·토큰은
+남기지 않습니다.** 패널의 "최근 결정" 섹션과 `GET /api/approval/log`(ui/device 토큰만, hook 불가)로
+최신순 조회할 수 있습니다. `role`은 **사용한 자격증명 역할(ui/device)**일 뿐 특정 사람의 신원이나 실제
+물리버튼 사용, 도구 실행 결과를 증명하지 않으며, 기록에 실패하면 결정을 전달하지 않아(요청은 대기 상태로
+남고 훅은 `ask`로 폴백) **기록되지 않은 승인은 절대 전달되지 않습니다.**
+
 ## 사용한 AI 도구
 
 - **Claude Code (Anthropic)** — 요구사항·설계·구현·검증 작업에 사용했습니다. AI-DLC 산출물은

@@ -180,6 +180,80 @@ class ApprovalBrokerTests(unittest.TestCase):
         self.assertEqual(self.post("/api/session/end", registration, token=self.server.hook_token)[0], 200)
         self.assertEqual(self.get("/api/approval", token=self.server.ui_token)[1]["sessions"], 0)
 
+    # --- decision audit log (persistent) -------------------------------
+    #
+    # Scope: the broker records only that a resolver *submitted* a decision — tool name,
+    # the short input hash, the decision, the resolver credential role, and timestamps.
+    # It stores no summary, no full tool input, and no token, and it proves neither a
+    # person's identity nor that the tool actually ran.
+
+    SAFE_LOG_KEYS = {"id", "tool_name", "input_hash", "decision", "role", "created_at", "resolved_at"}
+
+    def test_resolve_records_decision_with_resolver_role(self):
+        ui_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": ui_id, "decision": "allow"},
+                                   token=self.server.ui_token)[0], 200)
+        dev_id = self.server.create_approval("b1", "s1", "tu2", "Write", {"file_path": "/tmp/x"})
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": dev_id, "decision": "deny"},
+                                   token=self.server.device_token)[0], 200)
+        status, body = self.get("/api/approval/log", token=self.server.ui_token)
+        self.assertEqual(status, 200)
+        self.assertEqual(body["count"], 2)
+        newest, older = body["decisions"]  # most-recent-first
+        self.assertEqual((newest["tool_name"], newest["decision"], newest["role"]), ("Write", "deny", "device"))
+        self.assertEqual((older["tool_name"], older["decision"], older["role"]), ("Bash", "allow", "ui"))
+        # Never leaks the summary, the full tool input, or any token.
+        for entry in body["decisions"]:
+            self.assertEqual(set(entry), self.SAFE_LOG_KEYS)
+
+    def test_decision_log_requires_ui_or_device_token(self):
+        self.assertEqual(self.get("/api/approval/log", token="")[0], 403)
+        self.assertEqual(self.get("/api/approval/log", token=self.server.hook_token)[0], 403)
+        self.assertEqual(self.get("/api/approval/log", token=self.server.ui_token)[0], 200)
+        self.assertEqual(self.get("/api/approval/log", token=self.server.device_token)[0], 200)
+
+    def test_duplicate_resolve_logs_exactly_once(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": approval_id, "decision": "allow"},
+                                   token=self.server.ui_token)[0], 200)
+        # A conflicting late resolve is rejected and must NOT add a second record.
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": approval_id, "decision": "deny"},
+                                   token=self.server.ui_token)[0], 409)
+        body = self.get("/api/approval/log", token=self.server.ui_token)[1]
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["decisions"][0]["decision"], "allow")
+
+    def test_decision_log_file_is_owner_only_and_survives_restart(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": approval_id, "decision": "allow"},
+                                   token=self.server.ui_token)[0], 200)
+        log_path = self.workspace / ".claude" / "approval-log.jsonl"
+        self.assertTrue(log_path.exists())
+        self.assertEqual(oct(os.stat(log_path).st_mode & 0o777), oct(0o600))
+        # A fresh server over the same workspace warms its panel view from disk.
+        restarted = SimulatorServer(("127.0.0.1", 0), "claude", self.workspace,
+                                    self.workspace / ".claude" / "binddeck-state.json")
+        try:
+            view = restarted.recent_decisions()
+            self.assertEqual(view["count"], 1)
+            self.assertEqual(view["decisions"][0]["tool_name"], "Bash")
+        finally:
+            restarted.terminal.stop()
+            restarted.server_close()
+
+    def test_log_write_failure_withholds_the_decision(self):
+        approval_id = self.server.create_approval("b1", "s1", "tu1", "Bash", {"command": "ls"})
+
+        def boom(_entry):
+            raise OSError("disk full")
+
+        self.server._append_decision_log = boom
+        # The resolve must not deliver an unlogged decision: 500, request stays pending.
+        self.assertEqual(self.post("/api/approval/resolve", {"approval_id": approval_id, "decision": "allow"},
+                                   token=self.server.ui_token)[0], 500)
+        self.assertEqual(self.server.list_pending()["count"], 1)
+        self.assertEqual(self.get("/api/approval/log", token=self.server.ui_token)[1]["count"], 0)
+
     # --- hook_bridge.py process, end-to-end (software-only, no hardware) ------
     #
     # These drive the REAL hooks/hook_bridge.py binary exactly as Claude Code's

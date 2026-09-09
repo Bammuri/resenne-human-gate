@@ -10,8 +10,8 @@ and `hypothesis` (local `.venv/`, gitignored — PEP 668 base env).
 
 ```bash
 npm install && python3 -m venv .venv && ./.venv/bin/pip install hypothesis   # once
-npm test                                                                     # 19 JS tests
-./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 49 Python tests
+npm test                                                                     # 23 JS tests
+./.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v           # 54 Python tests
 python3 server.py                                                            # run app
 ```
 
@@ -19,9 +19,9 @@ python3 server.py                                                            # r
 
 | Suite | Command | Result |
 |---|---|---|
-| Python unit + property | `unittest discover` (venv) | **49 passed** (incl. approval-gate broker + hook-process subprocess-E2E tests in `tests/test_approval.py`, gate-panel serving test in `test_server.py`) |
-| JS unit + property | `node --test tests/*.test.js` | **19 passed** (incl. 7 gate-panel tests in `tests/gate.test.js`) |
-| **Total** | | **68 passed, 0 failed** |
+| Python unit + property | `unittest discover` (venv) | **54 passed** (incl. approval-gate broker + hook-process subprocess-E2E tests + 5 decision-audit-log tests in `tests/test_approval.py`, gate-panel serving test in `test_server.py`) |
+| JS unit + property | `node --test tests/*.test.js` | **23 passed** (incl. 11 gate-panel tests — pending + recent-decisions view — in `tests/gate.test.js`) |
+| **Total** | | **77 passed, 0 failed** |
 
 Syntax gates: `node --check` on `app.js`/`web-terminal.js`/`serial.js`/`gate.js` and
 `py_compile` on `server.py`/`terminal.py`/`claude_state.py`/`hooks/claude_state_hook.py`/`hooks/hook_bridge.py`
@@ -36,6 +36,9 @@ all Codex/UNO artifacts (`terminal-codex`, `terminal-yolo`, `button-target`,
   CSP + `X-Frame-Options: DENY`, inbound serial whitelisting, no credentials in the
   firmware fork, `send_choice` action allow-list.
 - **Resiliency (RESILIENCY-05/06/10)**: verified — see performance-test-instructions.md.
+  RESILIENCY-05 (structured logging) additionally covered for the approval gate by the
+  persistent decision audit log (record-before-deliver; see the decision-audit-log bullet
+  below). This is one increment toward RESILIENCY-05, not a claim of full compliance.
 - **PBT (PBT-02/03/07/08/09)**: implemented in `tests/mapping.pbt.test.js` and
   `tests/test_mapping_pbt.py` (totality, purity, table consistency for the pure
   mappings; send_choice totality/consistency for the action→keys table).
@@ -52,6 +55,14 @@ all Codex/UNO artifacts (`terminal-codex`, `terminal-yolo`, `button-target`,
   APPROVE resolves it → the hook receives `{decision: allow}`; the hook token cannot self-resolve (403).
   No hardware or browser automation required. This proves the software chain up to — but not including —
   the real `claude` binary honouring the decision.
+- **Verified (software, decision audit log, 2026-09-09):** every resolved decision is appended to
+  `.claude/approval-log.jsonl` (mode 0600, outside the web root, gitignored) with only
+  `tool_name`/`input_hash`/`decision`/`role`/timestamps — no summary, no tool input, no token — and read
+  back via `GET /api/approval/log` (ui/device tokens only; hook token → 403). Covered by 5 unit tests
+  (role recorded, safe-keys-only, ui/device-only read, duplicate-resolve-logs-once, 0600 + reload-after-restart,
+  log-write-failure withholds the decision → 500 + request stays pending) and a live curl smoke
+  (`tmp/gate_log_smoke.py`). Records only that a resolver *submitted* a decision — `role` is the credential
+  role, not a person's identity, a physical-button proof, or proof the tool ran.
 - **Not yet verified:**
   1. Live `claude` honouring the gate's `permissionDecision` on the submission build (opt-in
      `claude --settings hooks/hook-gate.settings.example.json`) — the only remaining gate link,

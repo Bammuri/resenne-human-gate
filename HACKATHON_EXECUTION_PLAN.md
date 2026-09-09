@@ -66,7 +66,7 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기면서, 실행 직전
 
 **Re:senne HUMAN GATE는 실행 승인·거절을 전용 물리 버튼 두 개로 분리합니다.** 개발자는 화면에서 실행 요청을 확인하고 UNO R4 WiFi의 **✓ 승인(D2)** 또는 **✕ 거절(D3)**을 누릅니다. 제출 버전은 사람의 물리·웹 시뮬 입력을 **Python PTY 키응답**으로 실제 Claude Code의 대기 중 요청에 전달합니다 — **현재 이 저장소에서 바로 실행되는 완성 경로 = USB 시리얼 → PTY 키응답**입니다. **UNO R4 WiFi의 Node Bridge 경로(버튼→WebSocket→브리지→PTY)는 버튼↔브리지 왕복까지 실기기 확인**했고, **브리지↔Python 어댑터 통합이 남은 단계**입니다(§2).
 
-**`hook_bridge.py`의 PreToolUse allow/deny 게이트 — 코드 통합·단위검증·소프트웨어 E2E 완료(실행 중인 진짜 `claude`가 결정을 존중하는 라이브 링크는 사람 몫).** 승인 브로커(`server.py`의 `/api/approval*` + `hooks/hook_bridge.py`)를 이 저장소에 코드로 통합하고 단위테스트 + 서브프로세스 E2E 테스트(`tests/test_approval.py`)로 검증했습니다. 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 테스트 3개 + 실서버 curl 스모크로 소프트웨어 E2E 검증했고, 브라우저 승인 패널 **`/gate.html`에서 사람이 대기 중 도구 실행에 ✓ 허용 / ✕ 거부를 제출할 수 있습니다.** 팀 실기기 PoC에서 버튼→브리지→Python→실제 Claude 실행 게이트가 확인됐지만, **실행 중인 진짜 `claude`가 그 결정을 존중해 실제 도구 실행을 allow/deny 하는지는 라이브 세션에서 확인하는 단계(사람 몫)**입니다. 게이트는 프로젝트 기본 설정이 아니라 **별도 예시 settings(`hooks/hook-gate.settings.example.json`)로 옵트인 활성화**합니다. **PTY 키응답 경로가 이 제출의 유일한 *완전* E2E 검증 경로**이며, 제출 저장소의 `hooks/claude_state_hook.py`는 권한을 결정하지 않는 상태 신호입니다.
+**`hook_bridge.py`의 PreToolUse allow/deny 게이트 — 코드 통합·단위검증·소프트웨어 E2E 완료(실행 중인 진짜 `claude`가 결정을 존중하는 라이브 링크는 사람 몫).** 승인 브로커(`server.py`의 `/api/approval*` + `hooks/hook_bridge.py`)를 이 저장소에 코드로 통합하고 단위테스트 + 서브프로세스 E2E 테스트(`tests/test_approval.py`)로 검증했습니다. 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 테스트 3개 + 실서버 curl 스모크로 소프트웨어 E2E 검증했고, 브라우저 승인 패널 **`/gate.html`에서 사람이 대기 중 도구 실행에 ✓ 허용 / ✕ 거부를 제출할 수 있습니다.** 팀 실기기 PoC에서 버튼→브리지→Python→실제 Claude 실행 게이트가 확인됐지만, **실행 중인 진짜 `claude`가 그 결정을 존중해 실제 도구 실행을 allow/deny 하는지는 라이브 세션에서 확인하는 단계(사람 몫)**입니다. 게이트는 프로젝트 기본 설정이 아니라 **별도 예시 settings(`hooks/hook-gate.settings.example.json`)로 옵트인 활성화**합니다. **PTY 키응답 경로가 이 제출의 유일한 *완전* E2E 검증 경로**이며, 제출 저장소의 `hooks/claude_state_hook.py`는 권한을 결정하지 않는 상태 신호입니다. 또한 처리된(resolved) 게이트 결정은 **영속 감사 로그**(`server.py` `resolve_approval` → `.claude/approval-log.jsonl`, mode 0600·웹루트 밖·gitignore)에 `tool_name·input_hash·decision·role·시각`만 남고(summary·tool_input·토큰 제외), 브라우저 패널의 **최근 결정 뷰**(`GET /api/approval/log`, ui/device 토큰만)로 조회합니다. `role`은 사용한 자격증명 역할(ui/device)일 뿐 사람의 신원이나 실제 물리버튼 사용, 도구 실행 결과를 증명하지 않으며, 기록에 실패하면 결정을 전달하지 않아(요청 pending 유지) 훅은 fail-safe로 `ask`가 됩니다.
 
 매크로패드·스트림덱은 보통 버튼에 단축키·명령을 매핑해 **실행을 촉발**하는 용도로 쓰입니다. HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결정**에 연결합니다.
 
@@ -85,7 +85,7 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기면서, 실행 직전
 | **창의성 (15)** | 구조적 차별점(실행 촉발 → 승인·거절)이 **제출 repo 코드로** 증명됨: `server.py`(승인 브로커 — `create_approval` 중복제거 · `resolve_approval` 원자 CAS · `wait_for_decision` deadline→ask) · `hooks/hook_bridge.py`(실행 대기 후 `permissionDecision` allow/deny/ask 반환) · `tests/test_approval.py`(단위 + 서브프로세스 E2E) · 브라우저 승인 패널 `gate.html`·`gate.js`(`tests/gate.test.js`) · 기존 PTY 경로 `terminal.py`(`ACTION_KEYS`·`send_choice()`). AI-DLC 설계 문서 = `aidlc-docs/construction/approval-gate/design.md`. | 게이트는 이제 제출 repo에 **코드 통합 + 단위검증 + 소프트웨어 E2E 완료**(subprocess·curl 스모크·브라우저 패널)이지만 **실행 중인 진짜 `claude`가 결정을 존중하는 라이브 링크는 미검증(사람 몫)**. `terminal.py` 실행 경로·프로젝트 `.claude/settings.json`은 건드리지 않음(검증된 PTY 데모 회귀 방지·개발 세션 마비 방지 — astra 배선범위 A). **현재형은 "브라우저에서 게이트 요청에 allow/deny를 제출할 수 있다"까지만 허용 → "라이브 `claude` 결정 존중은 미검증·사람 몫"을 함께 명시.** PTY 키응답 경로가 제출 유일 *완전* E2E 검증 경로. |
 | **완성도 (15)** | 무편집 B 영상 + `screenshots/`(또는 `result/`)에 **① 승인 대기 → ② 승인 후 실행 → ③ 거절 후 미실행** 3컷. 진입점→실제 구현 도달, 스샷↔README 정합. | 제출 폴더에 `screenshots/`·`result/` **현재 없음 → 생성 필수.** 핵심 경로 TODO/빈함수 제거(펌웨어 `request_id` echo TODO 포함, 아래). **오류 처리 검증**: 버튼 연결 끊김·브리지 종료 시 오류를 알리고 **의도치 않은 승인이 생기지 않는지** 확인·기록. |
 | **사용성 (15)** | README 첫 실행 경로 = **연결 → Claude 시작 → 요청 내용 화면 확인 → ✓ 실행 / ✕ 미실행 확인.** OLED·화면 인터랙션 피드백(대기/실행/완료/오류/오프라인, §7). **승인 대기·결정 전달·실행 결과를 사용자가 어디서 확인하는지** README·시연에 명시. | "버튼 전송 성공"만으로는 핵심 시나리오 완주 아님 → **끝까지 통과하는 하나의 경로**를 README에 고정하고 그대로 따라가 막히지 않는지 확인. |
-| **유지보수·보안 (10)** | 시크릿 = 환경변수(공개 repo 미포함), localhost 가드(Host allowlist·토큰 compare_digest·Origin·CSP·X-Frame-Options), 로컬 승인 API. 요청별 결합 = `request_id` 최초 1회. | `firmware/resenne_uno_r4/resenne_uno_r4.ino:162`의 **`request_id` echo TODO(통합)** 해결 + 오래된 입력이 새 요청에 적용되지 않음을 검증. **`request_id` 중복 처리(정합)와 송신자 인가(보안)를 구분** — 연결 가능한 주체·승인 입력 허용 조건을 제출 코드 기준으로 명시. |
+| **유지보수·보안 (10)** | 시크릿 = 환경변수(공개 repo 미포함), localhost 가드(Host allowlist·토큰 compare_digest·Origin·CSP·X-Frame-Options), 로컬 승인 API. 요청별 결합 = `request_id` 최초 1회. **게이트 결정 감사 로그**(RESILIENCY-05 준수 근거): 처리된 결정만 `.claude/approval-log.jsonl`(0600·웹루트 밖·gitignore)에 `tool_name·input_hash·decision·role·시각`만 기록(summary·tool_input·토큰 제외), 조회는 ui/device 토큰만(`GET /api/approval/log`), 기록 실패 시 결정 미전달(fail-safe ask). | `firmware/resenne_uno_r4/resenne_uno_r4.ino:162`의 **`request_id` echo TODO(통합)** 해결 + 오래된 입력이 새 요청에 적용되지 않음을 검증. **`request_id` 중복 처리(정합)와 송신자 인가(보안)를 구분** — 연결 가능한 주체·승인 입력 허용 조건을 제출 코드 기준으로 명시. 감사 로그의 `role`은 자격증명 역할일 뿐 신원·물리버튼·실행결과 증명이 아니며, 이 한 증분으로 RESILIENCY-05 완전 준수를 선언하지 않는다. |
 
 ---
 
@@ -210,7 +210,7 @@ Button Lab 브라우저 (sim.html / app)
 - **과거 승인 기록을 소급 조작 금지.** 지금부터 실제 결정을 기록.
 - 명확히 구분: **이번 MVP가 직접 제어하는 것 = Claude의 실행 승인.** AI-DLC 전 과정 자동 제어는 확장 방향(개발 과정에 AI-DLC를 썼다는 증거는 충분히 제출).
 
-**문서 정합성 정리(감점 방지, 필수):** 현재 저장소 README/일부 aidlc-docs가 최종 HW를 **BindDeck ESP32**로, 테스트를 **43 passed**로 기록 → 실제 제출은 **UNO R4 WiFi / 68 tests(49 Python + 19 JS)**. README·`aidlc-state.md`·requirements/design의 "최종 구현 경로"를 UNO로 통일하고 BindDeck은 "과거 실험 경로"로 격리, 테스트 수치를 **68(49 Python + 19 JS)로 통일**.
+**문서 정합성 정리(감점 방지, 필수):** 현재 저장소 README/일부 aidlc-docs가 최종 HW를 **BindDeck ESP32**로, 테스트를 **43 passed**로 기록 → 실제 제출은 **UNO R4 WiFi / 77 tests(54 Python + 23 JS)**. README·`aidlc-state.md`·requirements/design의 "최종 구현 경로"를 UNO로 통일하고 BindDeck은 "과거 실험 경로"로 격리, 테스트 수치를 **77(54 Python + 23 JS)로 통일**.
 
 ---
 
@@ -288,7 +288,7 @@ OLED = 설명 화면이 아니라 **"지금 누구 차례인지"** 화면. 작�
 - [ ] 거절(✕ 물리 버튼2) 또는 중단이 실제로 동작한다
 - [ ] 같은 시나리오를 **연속 3회 재현**한다
 - [ ] 하드웨어가 끊겨도 **mock/browser fallback**으로 데모 가능
-- [ ] README · `aidlc-docs/` · 테스트 수치(68 = 49 Python + 19 JS) · 영상이 **UNO R4 WiFi 기준으로 일치**
+- [ ] README · `aidlc-docs/` · 테스트 수치(77 = 54 Python + 23 JS) · 영상이 **UNO R4 WiFi 기준으로 일치**
 - [ ] 공개 저장소에 비밀정보 0 · 승인 API 로컬 제한 · localhost 가드 유지
 - [ ] **(완성도)** `screenshots/`(또는 `result/`)에 **승인 대기 / 승인 후 실행 / 거절 후 미실행** 3컷이 있고 README 기능과 일치
 - [x] **(창의성)** B-검증 PoC(`hook_bridge.py` allow/deny 게이트)를 제출 repo로 **코드 통합 + 단위검증(`tests/test_approval.py`) + 소프트웨어 E2E 완료** — `server.py`의 승인 브로커(`/api/approval*`)와 `hooks/hook_bridge.py`가 진입점→게이트까지 실제로 닿고, 진짜 `hook_bridge.py` 프로세스 ↔ 브로커 ↔ 브라우저(ui 토큰) resolver 체인을 서브프로세스 E2E 3개 + 실서버 curl 스모크로 검증, 브라우저 승인 패널 `/gate.html`(`tests/gate.test.js`) 추가. 설계 문서 = `aidlc-docs/construction/approval-gate/design.md`. **실행 중인 진짜 `claude`가 결정을 존중하는 라이브 링크는 미검증(사람 몫)**이므로 "제출 repo가 실행 중인 claude의 실제 도구 실행을 게이트한다"는 현재형 주장 금지 — 옵트인(`hooks/hook-gate.settings.example.json`)이며 `terminal.py`·프로젝트 `.claude/settings.json`은 불변
@@ -298,4 +298,4 @@ OLED = 설명 화면이 아니라 **"지금 누구 차례인지"** 화면. 작�
 
 ---
 
-*작성 근거: gpt-6-astra(fast) 최종 기획 + gpt-5.6-luna 보완안 + 팀 정정(키캡=리센느 사진, 실기기=UNO R4 WiFi, 테스트 baseline=45 → 게이트 통합 후 68 = 49 Python + 19 JS). 상세 원문은 `/home/hj/.claude/jobs/` 세션 산출물 참조.*
+*작성 근거: gpt-6-astra(fast) 최종 기획 + gpt-5.6-luna 보완안 + 팀 정정(키캡=리센느 사진, 실기기=UNO R4 WiFi, 테스트 baseline=45 → 게이트 통합 후 68 → 결정 감사 로그 증분 후 77 = 54 Python + 23 JS). 상세 원문은 `/home/hj/.claude/jobs/` 세션 산출물 참조.*

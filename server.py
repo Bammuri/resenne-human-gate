@@ -2,6 +2,7 @@
 """Local BindDeck button simulator that drives an app-owned Claude Code session."""
 
 import argparse
+import collections
 import hashlib
 import json
 import os
@@ -64,6 +65,13 @@ DEFAULT_CSP = (
 APPROVAL_WAIT_SECONDS = 80
 # Drop a session that has not been heard from in this long (no SessionEnd received).
 SESSION_TTL_SECONDS = 1800
+# Decision audit log: keep the most recent this-many *resolved* decisions on disk (mode
+# 0600, outside the static web root and gitignored) and mirror the tail in memory for the
+# panel view. "append-only" describes the write path, not tamper-proofing; the stored
+# short input hash is neither anonymisation nor an integrity proof; and a logged decision
+# records only that a resolver submitted it — never that the tool actually ran.
+APPROVAL_LOG_MAX = 500
+APPROVAL_LOG_READ_LIMIT = 50
 
 
 def summarize_tool(tool_name, tool_input):
@@ -102,6 +110,13 @@ class SimulatorServer(ThreadingHTTPServer):
         self.approvals = {}       # approval_id -> record
         self.sessions = {}        # (bridge_id, session_id) -> last_seen (monotonic)
         self.approval_cv = threading.Condition()
+        # Persistent decision audit log (all guarded by approval_cv). A resolved decision is
+        # written to disk BEFORE it is delivered, so the broker never hands back an unlogged
+        # allow/deny. The in-memory deque is the newest-first tail the panel reads.
+        self.decision_log = collections.deque(maxlen=APPROVAL_LOG_MAX)
+        self._decision_log_lines = 0
+        self.decision_log_path = self.workspace / ".claude" / "approval-log.jsonl"
+        self._load_decision_log()
         self.send_lock = threading.Lock()
         self.last_sent = 0.0
         self.replies = {}
@@ -163,16 +178,93 @@ class SimulatorServer(ThreadingHTTPServer):
                     return "ask"
                 self.approval_cv.wait(timeout=min(remaining, 5))
 
-    def resolve_approval(self, approval_id, decision):
-        """Atomic compare-and-set pending -> allow/deny. Returns the record or None on conflict."""
+    def resolve_approval(self, approval_id, decision, resolver_role="ui"):
+        """Atomic compare-and-set pending -> allow/deny, recording the decision first.
+
+        Returns the record, or None on conflict (already resolved / expired / unknown).
+        Raises OSError if the decision could not be written to the audit log — the caller
+        must then withhold the decision so the waiting hook fails safe to "ask". Exactly
+        one log record is written per successful resolution (the compare-and-set guarantees
+        a second resolve of the same id returns None before reaching the log)."""
         with self.approval_cv:
             self._purge(time.monotonic())
             record = self.approvals.get(approval_id)
             if record is None or record["status"] != "pending":
                 return None
+            resolved_at = time.time()
+            # Record BEFORE flipping status: if the write raises, status stays "pending",
+            # nothing is delivered, and the request can still expire to a fail-safe "ask".
+            self._append_decision_log({
+                "id": approval_id,
+                "tool_name": record["tool_name"],
+                "input_hash": record["input_hash"],
+                "decision": decision,
+                "role": resolver_role,
+                "created_at": record["created_at"],
+                "resolved_at": resolved_at,
+            })
             record["status"] = decision
+            record["resolved_at"] = resolved_at
+            record["resolver_role"] = resolver_role
             self.approval_cv.notify_all()
             return record
+
+    # --- decision audit log ----------------------------------------------
+    # Stores only tool_name, the short input hash, the decision, the resolver credential
+    # role, and timestamps — never the summary, the full tool input, or any token.
+
+    def _load_decision_log(self):
+        """Warm the in-memory tail from disk so the panel survives a server restart."""
+        try:
+            with open(self.decision_log_path, encoding="utf-8") as fh:
+                lines = [line for line in fh.read().splitlines() if line.strip()]
+        except OSError:
+            return
+        self._decision_log_lines = len(lines)
+        for line in lines[-APPROVAL_LOG_MAX:]:
+            try:
+                self.decision_log.append(json.loads(line))
+            except ValueError:
+                continue
+
+    def _append_decision_log(self, entry):
+        """Persist one decision (0600, append), then cache it. Caller holds approval_cv.
+
+        Raises OSError on write failure so resolve_approval can withhold the decision.
+        File compaction is best-effort housekeeping only — correctness never depends on it."""
+        line = (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
+        self.decision_log_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(self.decision_log_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        try:
+            os.write(fd, line)
+        finally:
+            os.close(fd)
+        self.decision_log.append(entry)
+        self._decision_log_lines += 1
+        if self._decision_log_lines > APPROVAL_LOG_MAX * 2:
+            try:
+                self._compact_decision_log()
+            except OSError:
+                pass  # keep serving from the in-memory tail; retry on the next append
+
+    def _compact_decision_log(self):
+        """Rewrite the file down to the bounded in-memory tail. Caller holds approval_cv."""
+        tmp = self.decision_log_path.with_name(self.decision_log_path.name + ".tmp")
+        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            for item in self.decision_log:
+                os.write(fd, (json.dumps(item, ensure_ascii=False) + "\n").encode("utf-8"))
+        finally:
+            os.close(fd)
+        os.replace(str(tmp), str(self.decision_log_path))
+        self._decision_log_lines = len(self.decision_log)
+
+    def recent_decisions(self, limit=APPROVAL_LOG_READ_LIMIT):
+        """Most-recent-first view of resolved decisions for the ui/device panel."""
+        with self.approval_cv:
+            items = list(self.decision_log)[-limit:]
+            items.reverse()
+            return {"decisions": items, "count": len(items)}
 
     def list_pending(self):
         with self.approval_cv:
@@ -234,6 +326,16 @@ class Handler(BaseHTTPRequestHandler):
         provided = self.headers.get("X-Simulator-Token", "")
         return any(secrets.compare_digest(provided, token) for token in expected)
 
+    def resolver_role(self):
+        """Which resolving credential authenticated this request: "device" or "ui".
+
+        This is the credential role used, not a person's identity and not proof that a
+        physical button was pressed — the audit log records it verbatim under that caveat."""
+        provided = self.headers.get("X-Simulator-Token", "")
+        if secrets.compare_digest(provided, self.server.device_token):
+            return "device"
+        return "ui"
+
     def do_GET(self):
         if not self.valid_host():
             return self.respond(403, {"error": "로컬 주소로 접속해 주세요."})
@@ -251,6 +353,12 @@ class Handler(BaseHTTPRequestHandler):
             if not self.token_ok(self.server.ui_token, self.server.device_token):
                 return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
             return self.respond(200, self.server.list_pending())
+        if path == "/api/approval/log":
+            # 최근 결정 이력 조회: 대기목록과 동일하게 ui/device 토큰만. hook 토큰은 불가
+            # (등록·대기 전용) — 결정 기록을 자가승인 판단에 쓰지 못하게 한다.
+            if not self.token_ok(self.server.ui_token, self.server.device_token):
+                return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
+            return self.respond(200, self.server.recent_decisions())
         if path in ("/api/state", "/api/terminal"):
             if not secrets.compare_digest(self.headers.get("X-Simulator-Token", ""), self.server.token):
                 return self.respond(403, {"error": "페이지를 새로고침해 주세요."})
@@ -344,7 +452,13 @@ class Handler(BaseHTTPRequestHandler):
         decision = payload.get("decision")
         if decision not in ("allow", "deny") or not isinstance(approval_id, str) or not approval_id:
             return self.respond(400, {"error": "approval_id와 allow/deny가 필요합니다."})
-        record = self.server.resolve_approval(approval_id, decision)
+        try:
+            record = self.server.resolve_approval(approval_id, decision, self.resolver_role())
+        except OSError:
+            # The decision could not be written to the audit log: withhold it. The request
+            # stays pending and the waiting hook fails safe to Claude's normal prompt
+            # ("ask") — the broker never delivers an unlogged allow/deny.
+            return self.respond(500, {"error": "결정을 기록하지 못해 승인을 전달하지 않았습니다."})
         if record is None:
             return self.respond(409, {"error": "이미 처리되었거나 만료된 승인입니다."})
         return self.respond(200, {"ok": True, "decision": decision, "tool_name": record["tool_name"]})
