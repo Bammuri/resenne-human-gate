@@ -46,7 +46,7 @@ GATES = [
             ("Yes, and don't ask again for Bash this session", True),
             ("No, tell Claude what to do differently", False),
         ],
-        "approve": ["$ npm test", "✔ 43 passing (31 python + 12 js)", "통과했어요. 변경을 커밋하고 푸시할까요?"],
+        "approve": ["$ npm test", "✔ 77 passing (54 python + 23 js)", "통과했어요. 변경을 커밋하고 푸시할까요?"],
         "deny": ["↩ 테스트 실행을 건너뜁니다.", "변경을 커밋하고 푸시할까요?"],
     },
     {

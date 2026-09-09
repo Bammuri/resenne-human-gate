@@ -52,7 +52,7 @@ const SCRIPT = [
     ],
     approveSay:[
       { cls:"dim", text:"$ npm test" },
-      { cls:"ok",  text:"✔ 43 passing (31 python + 12 js)" },
+      { cls:"ok",  text:"✔ 77 passing (54 python + 23 js)" },
       { cls:"sys", text:"● 통과했어요. 변경을 커밋하고 푸시할까요?" },
     ],
     denySay:[

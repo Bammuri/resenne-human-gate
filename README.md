@@ -28,7 +28,7 @@ Claude Code에 파일 수정과 쉘 명령 실행을 맡기면서, 실행 직전
 물리·웹 시뮬 입력을 **Python PTY 키응답**으로 실제 Claude Code의 대기 중 요청에 전달합니다 —
 **현재 이 저장소에서 바로 실행되는 완성 경로 = USB 시리얼 → PTY 키응답**입니다. **UNO R4 WiFi의
 Node Bridge 경로(버튼→WebSocket→브리지→PTY)는 버튼↔브리지 왕복까지 실기기 확인**했고,
-**브리지↔Python 어댑터 통합이 남은 단계**입니다(아래 [실물 UNO R4 WiFi 연결](#실물-uno-r4-wifi-연결-제출-기준)).
+**브리지↔Python 어댑터 통합이 남은 단계**입니다(아래 [실물 UNO R4 WiFi 연결](#실물-uno-r4-wifi-연결-검증된-별도-경로)).
 
 **`hook_bridge.py`의 PreToolUse allow/deny 게이트 — 코드 통합·단위검증·소프트웨어 E2E 완료(실행 중인
 진짜 `claude`가 결정을 존중하는 라이브 링크는 사람/라이브 데모 몫).** 지정 도구 실행을 버튼 승인까지
@@ -67,6 +67,7 @@ HUMAN GATE는 버튼을 **이미 제안된 실행 요청의 승인·거절 결�
 python3 server.py                          # http://127.0.0.1:8765
 python3 server.py --cwd /path/to/project   # Claude 세션을 이 폴더에서 실행
 python3 server.py --port 8766
+python3 server.py --mock                   # claude·하드웨어 없이 승인 흐름만 재현(스크립트 스탠드인)
 ```
 
 서버는 이 컴퓨터의 `127.0.0.1`에서만 접속할 수 있습니다. 웹 터미널 명령과 Claude 세션은 **서버를
@@ -82,7 +83,11 @@ python3 server.py --port 8766
 **첫 시나리오(핵심 경로 한 줄)**
 `python3 server.py` → 브라우저에서 `http://127.0.0.1:8765` 열기 → **Claude 시작** → 요청 입력 →
 승인 프롬프트가 뜨면 **웹 시뮬레이션 또는 실물 버튼으로 ✓ 승인 / ✕ 거절** → 화면·OLED에서 결과 확인.
-하드웨어 연결·시뮬레이션 키·검증 절차는 아래 상세 섹션을 참고하세요.
+
+하드웨어나 Claude 설치 없이 흐름만 보려면 `python3 server.py --mock`으로 서버를 띄운 뒤 브라우저에서
+**웹 시뮬레이션** 버튼으로 그대로 재현할 수 있습니다(승인·거절은 스크립트 스탠드인 세션에 전달되며 실제
+도구는 실행하지 않습니다). 이 경로는 UNO R4 WiFi·Node Bridge 없이 동작합니다. 하드웨어 연결·시뮬레이션
+키·검증 절차는 아래 상세 섹션을 참고하세요.
 
 ### 승인 게이트 활성화 (옵트인)
 
@@ -161,20 +166,23 @@ claude --settings hooks/hook-gate.settings.example.json
 
 *아래는 완성도·사용성·유지보수 근거가 되는 상세 문서입니다.*
 
-## 하드웨어 (제출 기준 = Arduino UNO R4 WiFi)
+## 하드웨어 (정본 실행 경로 = USB 시리얼 → PTY · UNO R4 WiFi = 검증된 별도 경로, 통합 예정)
 
-- **제출·검증 하드웨어 = Arduino UNO R4 WiFi** + 128×64 SSD1306 OLED + 물리 버튼 2개
+- **지금 이 저장소에서 바로 재현되는 정본 실행 경로 = USB 시리얼 → PTY.** 아래 "동작 방식·시리얼
+  규약"이 이 전송을 설명합니다. 펌웨어는 `firmware/binddeck_claude/`(BindDeck ESP32 매크로패드,
+  USB 시리얼)와 `firmware/yes_no/`(UNO R4 2버튼 USB 시리얼)이며, 웹 시뮬레이션으로 하드웨어 없이도
+  같은 경로를 재현할 수 있습니다.
+- **팀이 제작한 제출 디바이스 = Arduino UNO R4 WiFi** + 128×64 SSD1306 OLED + 물리 버튼 2개
   (✓ **APPROVE** = D2, ✕ **REJECT** = D3). 펌웨어 = **`firmware/resenne_uno_r4/`**.
-- 전송 경로 = 버튼 → UNO R4 WiFi(2.4GHz) → WebSocket → Node Bridge(`ws://…:8080`) → 앱의 PTY 승인 seam.
-  **버튼→브리지 왕복을 실기기에서 검증**(2026-09-07~08, 30ms 디바운스 21회 클린). OLED·D3 버튼은
-  팀 버튼 테스트 스케치로 실기기 확인한 뒤 이 펌웨어에 통합했습니다. **Node Bridge ↔ Python(PTY)
-  어댑터 연결은 통합 남은 작업**입니다(`HACKATHON_EXECUTION_PLAN.md` §2).
-- **초기 탐색 경로(문서 보존)**: `firmware/binddeck_claude/`(BindDeck ESP32 매크로패드, USB 시리얼)와
-  `firmware/yes_no/`(UNO R4 초기 2버튼 USB 시리얼). 아래 "동작 방식·시리얼 규약"은 **이 USB 시리얼
-  전송**을 설명하며, 현재 이 저장소에서 바로 실행되는 경로입니다. UNO R4 WiFi 경로는 같은 PTY 승인
-  seam에 WebSocket(Node Bridge)로 도달합니다.
+- UNO R4 WiFi의 전송 경로 = 버튼 → UNO R4 WiFi(2.4GHz) → WebSocket → Node Bridge(`ws://…:8080`)
+  → 앱의 PTY 승인 seam. **버튼→브리지 왕복은 실기기에서 검증**했고(2026-09-07~08, 30ms 디바운스 21회
+  클린), OLED·D3 버튼도 팀 버튼 테스트 스케치로 확인한 뒤 이 펌웨어에 통합했습니다. 다만 **Node Bridge ↔
+  Python(PTY) 어댑터 연결은 통합이 남은 단계**입니다(`HACKATHON_EXECUTION_PLAN.md` §2). 즉 UNO R4 WiFi는
+  **검증된 별도 경로이며, 위 USB 시리얼 정본 경로와 같은 PTY 승인 seam으로 합류할 예정**입니다.
 
-> ⚠️ 이전 문서 일부는 최종 HW를 BindDeck ESP32로 적었으나, **제출 기준 하드웨어는 UNO R4 WiFi**입니다.
+> ⚠️ 이전 문서 일부는 최종 HW를 BindDeck ESP32로 적었으나, 팀이 제작한 제출 디바이스는 **UNO R4 WiFi**입니다.
+> 다만 지금 저장소에서 **바로 재현되는 실행 경로는 USB 시리얼 → PTY**이고, UNO R4 WiFi의 WiFi(Node Bridge)
+> 경로는 통합이 남은 단계입니다.
 
 ## 동작 방식 (요약)
 
@@ -219,7 +227,7 @@ Claude 세션이 앱 소유 PTY에서 실행 중일 때만 버튼이 활성화�
 
 이 시뮬레이션은 버튼·시리얼 동작을 재현합니다. ESP32 CPU나 펌웨어 실행을 에뮬레이션하지는 않습니다.
 
-## 실물 UNO R4 WiFi 연결 (제출 기준)
+## 실물 UNO R4 WiFi 연결 (검증된 별도 경로)
 
 준비물: Arduino UNO R4 WiFi, 128×64 SSD1306 OLED(I2C), 물리 버튼 2개, USB 케이블, 2.4GHz AP.
 
@@ -241,7 +249,7 @@ ERROR=`ERROR`, DISCONNECTED=`OFFLINE`. 자동 승인은 꺼져 있어 **사람�
 > 승인 처리(`server.py`)를 잇는 어댑터는 통합 남은 작업입니다(`HACKATHON_EXECUTION_PLAN.md` §2).
 > 현재 이 저장소에서 바로 실행되는 완성 경로는 아래 **USB 시리얼(BindDeck)** 연결입니다.
 
-## 실물 BindDeck 연결 (초기 탐색 경로)
+## 실물 BindDeck 연결 (정본 실행 경로 · USB 시리얼)
 
 준비물: BindDeck(ESP32-WROOM-32 + SSD1306 OLED + KY-040 엔코더 + 8 스위치), USB **데이터 케이블**.
 
@@ -251,7 +259,7 @@ ERROR=`ERROR`, DISCONNECTED=`OFFLINE`. 자동 승인은 꺼져 있어 **사람�
 3. ESP32 보드와 포트를 선택하고 업로드합니다.
 4. (선택) 상태 표시를 위해 이 폴더의 `.claude/settings.json` 훅을 활성화한 상태로 Claude를 실행합니다.
    훅이 없어도 트랜스크립트 mtime 폴백으로 대략적인 상태를 표시합니다.
-5. 다른 시리얼 모니터를 닫고 데스크톱 Chrome에서 Button Lab을 엽니다.
+5. 다른 시리얼 모니터를 닫고 데스크톱 Chrome에서 이 페이지(`http://127.0.0.1:8765`)를 엽니다.
 6. **실물 BindDeck · USB → USB BindDeck 연결**을 누르고 보드 포트를 선택합니다.
 7. **Claude 시작**으로 세션을 실행하면, 실물 버튼이 승인 프롬프트에 바로 전송됩니다.
    OLED에는 Claude 상태와 마지막 응답이 표시됩니다.
