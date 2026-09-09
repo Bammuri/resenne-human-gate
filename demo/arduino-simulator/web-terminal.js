@@ -1,5 +1,7 @@
 "use strict";
 
+const BUILD_MESSAGE = "작성한 계획대로 구현을 시작해 주세요.";
+const ACCEPT_MESSAGE = "현재 제안 또는 결과를 승인합니다. 해당 내용에 맞게 진행해 주세요.";
 const DENIED_MESSAGE = "현재 제안은 거절합니다. 같은 방법을 반복하지 말고 다른 대안을 제안해 주세요. 새 대안은 바로 실행하지 말고 제 승인을 기다려 주세요.";
 const CHECK_MESSAGE = "지금까지 한 작업을 직접 검증해 주세요. 관련 테스트를 실행하고 오류·누락·요구사항 충족 여부를 확인한 뒤, 수행한 검증과 결과를 보고해 주세요. 이미 검증했더라도 현재 상태를 기준으로 다시 확인해 주세요. 직접 확인할 수 없는 항목은 미검증으로 구분하고, 실제 장치 조작 등 사용자만 할 수 있는 확인만 요청해 주세요.";
 
@@ -143,12 +145,15 @@ class BrowserTerminal {
     await this.request("input", { data, generation: this.generation, ...(expectedCursor === undefined ? {} : { expectedCursor }) });
     this.term.focus();
   }
-  async nativeCommand(command) {
+  hasNativeDraft() {
     const buffer = this.term.buffer.active;
     const line = buffer.getLine(buffer.baseY + buffer.cursorY)?.translateToString(true, 0, buffer.cursorX) || "";
-    if (/^\s*[❯›>]\s*\S/.test(line)) throw new Error("터미널에 작성 중인 입력을 먼저 보내거나 지워 주세요.");
+    return /^\s*[❯›>]\s*\S/.test(line);
+  }
+  async nativeCommand(command, prefix = "") {
+    if (this.hasNativeDraft()) throw new Error("터미널에 작성 중인 입력을 먼저 보내거나 지워 주세요.");
     // Paste as a unit so slash-menu autocomplete cannot consume the submit key.
-    await this.nativeInput(`\x1b[200~${command}\x1b[201~\r`);
+    await this.nativeInput(`${prefix}\x1b[200~${command}\x1b[201~\r`);
   }
   async nativeAction(item) {
     if (item.generation !== this.generation) throw new Error("AI 세션이 바뀌었습니다.");
@@ -163,16 +168,27 @@ class BrowserTerminal {
       catch (error) { this.message(error.message); throw error; }
       return;
     }
-    if (item.action === "plan" || item.action === "build") {
-      if (item.action === this.mode) return;
-      if (item.action === "plan") await this.nativeCommand("/plan");
-      else await this.nativeInput("\x1b[Z");
-      this.mode = item.action;
+    if (item.action === "plan") {
+      if (this.mode === "plan") return;
+      await this.nativeCommand("/plan");
+      this.mode = "plan";
+      return;
+    }
+    if (item.action === "build") {
+      // Check for a draft before changing modes, then send the mode key and
+      // implementation request together so other input cannot split them.
+      await this.nativeCommand(BUILD_MESSAGE, this.mode === "plan" ? "\x1b[Z" : "");
+      this.mode = "build";
       return;
     }
     if (item.action === "model" || item.action === "diff") return this.nativeCommand(`/${item.action}`);
     if (item.action === "check") return this.nativeCommand(CHECK_MESSAGE);
-    if (item.action === "accept") return this.nativeInput("\r");
+    if (item.action === "accept") {
+      // Enter still submits a draft or confirms a CLI menu. An empty composer
+      // needs an explicit response for ordinary conversational approvals.
+      const menu = this.question?.interactive || this.screenLines().slice(-8).some(line => /enter to (?:confirm|select)/i.test(line));
+      return this.hasNativeDraft() || menu ? this.nativeInput("\r") : this.nativeCommand(ACCEPT_MESSAGE);
+    }
     if (item.action === "denied") return this.nativeCommand(DENIED_MESSAGE);
     if (item.action === "stop") return this.nativeInput("\x1b");
     throw new Error("이 기능은 터미널에 직접 입력해 주세요.");

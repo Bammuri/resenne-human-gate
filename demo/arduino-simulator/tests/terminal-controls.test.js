@@ -115,6 +115,72 @@ test('focus reports and navigation do not mark a native question answered', asyn
     assert.equal(terminal.dismissedNative, 'q5');
   }
 });
+function buildTerminal({ mode = 'plan', draft = '', request } = {}) {
+  const fs = require('node:fs'), vm = require('node:vm');
+  const BrowserTerminal = vm.runInNewContext(fs.readFileSync(require.resolve('../web-terminal.js'), 'utf8') + '\nBrowserTerminal');
+  const terminal = Object.create(BrowserTerminal.prototype), writes = [];
+  Object.assign(terminal, { generation: 'g', mode, running: true, inputBlocked: false,
+    inputChain: Promise.resolve(), request: request || (async (action, payload) => writes.push({ action, ...payload })),
+    term: { focus() {}, buffer: { active: { baseY: 0, cursorY: 0, cursorX: 2 + draft.length,
+      getLine: () => ({ translateToString: () => '❯ ' + draft }),
+    } } } });
+  return { terminal, writes };
+}
+test('BUILD leaves plan mode before submitting one implementation request', async () => {
+  for (const kind of ['codex', 'codex-yolo', 'claude', 'claude-yolo']) {
+    const { terminal, writes } = buildTerminal();
+    terminal.kind = kind;
+    await terminal.nativeAction({ generation: 'g', action: 'build' });
+    assert.deepEqual(writes, [{ action: 'input', generation: 'g',
+      data: '\x1b[Z\x1b[200~작성한 계획대로 구현을 시작해 주세요.\x1b[201~\r' }]);
+    assert.equal(terminal.mode, 'build');
+  }
+});
+test('BUILD in implementation mode submits the request without toggling back to plan', async () => {
+  const { terminal, writes } = buildTerminal({ mode: 'build' });
+  await terminal.nativeAction({ generation: 'g', action: 'build' });
+  assert.deepEqual(writes, [{ action: 'input', generation: 'g',
+    data: '\x1b[200~작성한 계획대로 구현을 시작해 주세요.\x1b[201~\r' }]);
+  assert.equal(terminal.mode, 'build');
+});
+test('BUILD preserves an unsent draft and does not change modes', async () => {
+  const { terminal, writes } = buildTerminal({ draft: '아직 작성 중인 요청' });
+  await assert.rejects(terminal.nativeAction({ generation: 'g', action: 'build' }), /작성 중인 입력/);
+  assert.deepEqual(writes, []);
+  assert.equal(terminal.mode, 'plan');
+});
+test('BUILD rejects a stale session and does not retry a failed transmission', async () => {
+  const { terminal, writes } = buildTerminal();
+  await assert.rejects(terminal.nativeAction({ generation: 'old', action: 'build' }), /AI 세션이 바뀌었습니다/);
+  assert.deepEqual(writes, []);
+  let attempts = 0;
+  const failed = buildTerminal({ request: async () => { attempts++; throw new Error('connection lost'); } });
+  await assert.rejects(failed.terminal.nativeAction({ generation: 'g', action: 'build' }), /connection lost/);
+  assert.equal(attempts, 1);
+  assert.equal(failed.terminal.mode, 'plan');
+});
+test('PLAN still only changes mode and ignores a repeated plan press', async () => {
+  const { terminal, writes } = buildTerminal({ mode: 'build' });
+  await terminal.nativeAction({ generation: 'g', action: 'plan' });
+  await terminal.nativeAction({ generation: 'g', action: 'plan' });
+  assert.deepEqual(writes, [{ action: 'input', generation: 'g', data: '\x1b[200~/plan\x1b[201~\r' }]);
+  assert.equal(terminal.mode, 'plan');
+});
+test('ACCEPT sends an explicit approval when the conversational input is empty', async () => {
+  const { terminal, writes } = buildTerminal({ mode: 'build' });
+  await terminal.nativeAction({ generation: 'g', action: 'accept' });
+  assert.deepEqual(writes, [{ action: 'input', generation: 'g',
+    data: '\x1b[200~현재 제안 또는 결과를 승인합니다. 해당 내용에 맞게 진행해 주세요.\x1b[201~\r' }]);
+});
+test('ACCEPT still submits drafted text and confirms native CLI menus with Enter', async () => {
+  for (const kind of ['draft', 'numbered-menu', 'unnumbered-menu']) {
+    const { terminal, writes } = buildTerminal({ draft: kind === 'draft' ? '직접 작성한 답변' : '' });
+    if (kind === 'numbered-menu') terminal.question = { interactive: true };
+    if (kind === 'unnumbered-menu') terminal.screenLines = () => ['❯ Yes', '  No', 'Enter to confirm · Esc to cancel'];
+    await terminal.nativeAction({ generation: 'g', action: 'accept' });
+    assert.deepEqual(writes, [{ action: 'input', generation: 'g', data: '\r' }]);
+  }
+});
 test('DENIED requests alternatives, CHECK requests direct verification, and STOP remains Escape', async () => {
   const fs = require('node:fs'), vm = require('node:vm');
   const BrowserTerminal = vm.runInNewContext(fs.readFileSync(require.resolve('../web-terminal.js'), 'utf8') + '\nBrowserTerminal');
@@ -148,6 +214,10 @@ test('ordinary lists, code, malformed choices and answered history are not menus
 test('mode detection reads the footer rather than mentions in past output', () => {
   assert.equal(terminalMode(['⏸ plan mode on (shift+tab to cycle)']), 'plan');
   assert.equal(terminalMode(['bypass permissions (shift+tab to cycle)']), 'build');
+  assert.equal(terminalMode(['⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← for agents']), 'build');
+  assert.equal(terminalMode(['⏸ manual mode on · ? for shortcuts · ← for agents']), 'build');
+  assert.equal(terminalMode(['⏸ plan mode on (shift+tab to cycle)', ...Array(8).fill(''),
+    '⏵⏵ auto mode on (shift+tab to cycle)']), 'build');
   assert.equal(terminalMode(['Please explain plan mode']),null);
 });
 

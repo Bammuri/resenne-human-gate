@@ -106,7 +106,7 @@
                 <g id="deck-key-1" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Codex 시작" data-action="codex" transform="translate(164 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">CODEX</text></g>
                 <g id="deck-key-2" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Codex YOLO 시작" data-action="yolo" transform="translate(270 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">YOLO</text></g>
                 <g id="deck-key-3" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Plan 모드 전환" data-action="plan" transform="translate(376 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">PLAN</text></g>
-                <g id="deck-key-4" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Build 모드 전환" data-action="build" transform="translate(482 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">BUILD</text></g>
+                <g id="deck-key-4" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Build 모드 전환 및 구현 시작" data-action="build" transform="translate(482 143)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">BUILD</text></g>
                 <g id="deck-key-5" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="터미널 보기" data-action="view" transform="translate(164 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">VIEW</text></g>
                 <g id="deck-key-6" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="터미널 숨기기" data-action="hide" transform="translate(270 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">HIDE</text></g>
                 <g id="deck-key-7" class="board-button deck-key" role="button" tabindex="-1" aria-disabled="true" aria-label="Accept 응답" data-action="accept" transform="translate(376 205)"><rect class="deck-key-base" width="94" height="50" rx="8"/><rect class="deck-key-top" x="5" y="-5" width="84" height="43" rx="7"/><text x="47" y="22">ACCEPT</text></g>
@@ -198,7 +198,7 @@
             <label for="workflow-brief">내 프로젝트 입력</label>
             <p id="workflow-writing-help">‘입력할 내용’의 항목별로 작성하세요. 모르는 내용은 “미정 · AI가 제안해 주세요”라고 적으면 됩니다. 예시는 자동으로 저장되지 않습니다.</p>
             <textarea id="workflow-brief" maxlength="20000" aria-describedby="workflow-writing-help"></textarea>
-            <p class="workflow-example-note">입력은 자동 저장됩니다. 7 RUN NOW는 노브의 AI 자율성 설정으로 바로 실행합니다. 6 ASK는 단계와 무관한 중간 질문이며 MD에 저장되지 않습니다.</p>
+            <p class="workflow-example-note">입력은 자동 저장됩니다. 7 RUN NOW는 지금까지 입력한 내용으로 새 창 없이 바로 구현·검증합니다. 6 ASK는 단계와 무관한 중간 질문이며 MD에 저장되지 않습니다.</p>
           </div>
         </div>
         <button id="workflow-save">저장</button>

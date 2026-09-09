@@ -18,15 +18,25 @@ test('exactly seven function slots and fixed MODE in all three profiles', () => 
   assert.deepEqual(Array.from({ length: 7 }, (_, i) => deck.capture(i + 1).action), ['model', 'plan', 'build', 'check', 'accept', 'denied', 'stop']);
 });
 
-test('numbered responses override every underlying mode action and block unused slots', () => {
+test('numbered responses override AI actions while custom sound keys remain fixed', () => {
   const deck = create(); ask(deck);
-  for (const mode of ['workflow', 'agent', 'custom']) {
+  for (const mode of ['workflow', 'agent']) {
     deck.configure({ ...deck.config, mode });
     assert.equal(deck.capture(1).action, 'answer');
     assert.equal(deck.capture(2).choice, 'answer-2');
     assert.equal(deck.capture(3).target, 'terminal');
     for (let slot = 4; slot <= 7; slot++) assert.equal(deck.capture(slot), null);
     assert.equal(deck.capture(8).action, 'mode');
+  }
+  deck.configure({ ...deck.config, mode: 'custom' });
+  for (const slot of [1, 2, 3, 4]) assert.equal(deck.capture(slot).action, 'board_sound');
+  assert.equal(deck.capture(7).action, 'audio_stop');
+  for (const slot of [5, 6]) assert.equal(deck.capture(slot), null);
+  ask(deck, question('six-options', 6));
+  for (const slot of [5, 6]) {
+    assert.equal(deck.capture(slot).action, 'answer');
+    assert.equal(deck.capture(slot).choice, `answer-${slot}`);
+    assert.equal(deck.capture(slot).target, 'terminal');
   }
 });
 
@@ -74,10 +84,10 @@ test('more than seven options use page-local button numbers and stale pages inva
 test('custom mappings keep their own execution target and fail identity checks after generation changes', () => {
   const deck = create();
   const custom = deck.config.custom.map(entry => ({ ...entry }));
-  custom[0] = { label: '리뷰 요청', action: 'prompt', target: 'current', text: '변경 내용을 리뷰해 주세요.' };
+  custom[4] = { label: '리뷰 요청', action: 'prompt', target: 'current', text: '변경 내용을 리뷰해 주세요.' };
   deck.configure({ mode: 'custom', custom });
-  const mapped = deck.capture(1);
-  assert.equal(mapped.target, 'current'); assert.equal(mapped.generation, 'current-a'); assert.equal(mapped.text, custom[0].text);
+  const mapped = deck.capture(5);
+  assert.equal(mapped.target, 'current'); assert.equal(mapped.generation, 'current-a'); assert.equal(mapped.text, custom[4].text);
   deck.update('current', { generation: 'current-b', ready: true });
   assert.equal(deck.isCurrent(mapped), false);
 });
@@ -109,11 +119,11 @@ test('multi-select buttons toggle without submitting, span pages, and reset on t
 });
 
 test('workflow questions stay available across modes, with the selected AI taking priority outside workflow mode', () => {
-  const deck = create(); ask(deck, question('workflow-pending'), 'workflow', 'run-a');
+  const deck = create(); ask(deck, question('workflow-pending', 5), 'workflow', 'run-a');
   for (const mode of ['workflow', 'agent', 'custom']) {
-    deck.configure({ ...deck.config, mode }); assert.equal(deck.capture(1).target, 'workflow');
+    deck.configure({ ...deck.config, mode }); assert.equal(deck.capture(5).target, 'workflow');
   }
-  ask(deck, question('terminal-pending'));
-  assert.equal(deck.capture(1).target, 'terminal');
-  deck.configure({ ...deck.config, mode: 'workflow' }); assert.equal(deck.capture(1).target, 'workflow');
+  ask(deck, question('terminal-pending', 5));
+  assert.equal(deck.capture(5).target, 'terminal');
+  deck.configure({ ...deck.config, mode: 'workflow' }); assert.equal(deck.capture(5).target, 'workflow');
 });

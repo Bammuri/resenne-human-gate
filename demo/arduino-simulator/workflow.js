@@ -7,7 +7,7 @@ const WORKFLOW_KEYS = [
   ["construction", "Construction", "구현과 검증", "승인한 계획을 구현하고 실제 테스트 결과를 확인합니다."],
   ["operation", "Operation", "인수와 운영 준비", "변경 검토·운영 점검·복구·인수인계를 준비합니다."],
   ["ask_workflow", "ASK", "자유로운 중간 질문", "AI-DLC와 별개로 질문하고 답변받습니다. MD에 저장하지 않습니다."],
-  ["start_workflow", "RUN NOW", "입력 저장 후 현재 단계 실행", "현재 입력을 저장하고 선택한 단계를 실행합니다."],
+  ["start_workflow", "RUN NOW", "현재 입력으로 바로 구현", "모든 입력을 저장하고 필요한 조사·설계부터 구현·검증까지 실행합니다."],
 ];
 const WORKFLOW_STOP = ["stop_revert", "RESTORE", "안전지점 복귀", "실제 변경 내용을 검토하고 복귀합니다."];
 const AUTONOMY = ["MANUAL", "GUIDE", "STEP", "AUTO CHECK", "AUTO BUILD", "FULL AUTO"];
@@ -196,6 +196,7 @@ class WorkflowController {
   async perform(fn) {
     if (this.pending) return;
     if (this.autosaveJob) await this.autosaveJob;
+    if (this.pending) return;
     this.pending = true; this.render();
     try { await fn(); }
     catch (error) { this.message(error.message, true); }
@@ -361,14 +362,16 @@ class WorkflowController {
     finally { this.chatPending = false; this.renderSideQuestion(); }
   }
   async run() {
-    const stage = this.stage;
-    this.openReview();
+    if (this.pending || this.data.running) return;
     return this.perform(async () => {
       await this.saveDrafts();
-      this.apply(await this.request("start", { stage }));
+      this.dialog.close();
+      this.el("review-dialog").close();
+      this.stage = "construction";
+      this.apply(await this.request("start", { stage: "construction" }));
       this.previewToken = ""; this.el("revert").hidden = true;
-      this.message(`${this.stage.toUpperCase()} 실행 중 · STOP으로 언제든 중단할 수 있습니다.`);
-      this.options.log("FLOW", `${this.stage.toUpperCase()} 시작`);
+      this.message("현재 입력으로 구현·검증 실행 중 · STOP으로 언제든 중단할 수 있습니다.");
+      this.options.log("FLOW", "RUN NOW · 전체 입력 저장 후 구현·검증 시작");
     });
   }
   openReview() {

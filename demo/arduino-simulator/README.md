@@ -20,11 +20,11 @@ python3 server.py --cwd /path/to/project
 |---|---|---|---|
 | D2 / 1 | MODEL · 노브 추론 강도 활성화 | Initialization · 프로젝트 초기화 | 커스텀 1 |
 | D3 / 2 | PLAN · 계획 모드 | Ideation · 문제·가치 | 커스텀 2 |
-| D4 / 3 | BUILD · 계획 모드 나가기 | Inception · 요구·설계 | 커스텀 3 |
+| D4 / 3 | BUILD · 계획 모드 해제 후 구현 시작 요청 | Inception · 요구·설계 | 커스텀 3 |
 | D5 / 4 | CHECK · AI가 테스트 및 요구사항 검증 | Construction · 구현·검증 | 커스텀 4 |
-| D6 / 5 | ACCEPT · 현재 선택 확인 / Enter | Operation · 인수·운영 준비 | 커스텀 5 |
+| D6 / 5 | ACCEPT · 현재 제안·결과 승인 / 입력·메뉴 확인 | Operation · 인수·운영 준비 | 커스텀 5 |
 | D7 / 6 | DENIED · 거절하고 다른 대안 요청 | ASK · 자유로운 중간 질문 (MD 저장 없음) | 커스텀 6 |
-| D8 / 7 | STOP · 작업 중단 / Esc | RUN NOW · 현재 입력 저장 후 실행 | 커스텀 7 |
+| D8 / 7 | STOP · 작업 중단 / Esc | RUN NOW · 전체 입력 저장 후 바로 구현·검증 | 커스텀 7 |
 | D9 / 8 | MODE → 2 | MODE → 3 | MODE → 1 |
 
 MODE 전환은 실행 중인 작업을 변경하지 않습니다. 화면 위의 MODE 버튼은 물리 버튼 8과 같은 동작입니다. 화면 STOP과 복귀 미리보기는 어느 모드에서도 접근할 수 있습니다. MODE를 길게 누르는 추가 기능은 없습니다.
@@ -45,7 +45,7 @@ MODE 전환은 실행 중인 작업을 변경하지 않습니다. 화면 위의 
 
 ## AI-DLC 사용
 
-모드 2는 [AI-DLC의 다섯 phase](https://awslabs.github.io/aidlc-workflows/reference/04-stages/inception/)를 프로젝트 작업 화면에 맞춰 구성합니다. 1–5번은 해당 입력 화면을 열고, **6 ASK**는 AI-DLC와 별개의 중간 질문 창을 열고, **7 RUN NOW**는 입력을 저장한 뒤 노브의 자율성 설정으로 추가 승인 없이 바로 실행합니다. 중단은 화면의 AI 즉시 중단 버튼을 사용합니다. 모달은 같은 큰 크기를 유지하고 내용만 내부에서 스크롤됩니다.
+모드 2는 [AI-DLC의 다섯 phase](https://awslabs.github.io/aidlc-workflows/reference/04-stages/inception/)를 프로젝트 작업 화면에 맞춰 구성합니다. 1–5번은 해당 입력 화면을 열고, **6 ASK**는 AI-DLC와 별개의 중간 질문 창을 엽니다. **7 RUN NOW**는 입력한 단계와 관계없이 모든 변경 입력을 먼저 저장한 뒤, 새 창 없이 필요한 조사·설계부터 Construction의 구현·검증까지 바로 실행합니다. 별도 Ideation 입력이 없어도 다른 단계에 적은 작업 내용을 사용하며, 아무 작업 내용도 없으면 입력을 안내합니다. 중단은 화면의 AI 즉시 중단 버튼을 사용합니다. 입력과 결과는 단계 화면에서 다시 확인할 수 있습니다.
 
 | 단계 | 입력 | 저장 문서 |
 |---|---|---|
@@ -146,11 +146,13 @@ node --test tests/*.test.js
 
 연동 참고: [Codex App Server](https://learn.chatgpt.com/docs/app-server), [Claude Code CLI](https://code.claude.com/docs/en/cli-reference), [Claude 사용자 입력](https://platform.claude.com/docs/en/agent-sdk/user-input), [Arduino 입력 풀업](https://docs.arduino.cc/built-in-examples/digital/InputPullupSerial/).
 
-CLI 제어 참고: [Claude 명령](https://code.claude.com/docs/en/commands), [Claude 권한 모드](https://code.claude.com/docs/en/permission-modes), [Codex 키 설정](https://github.com/openai/codex/blob/main/codex-rs/tui/src/keymap.rs). PLAN은 `/plan`, BUILD는 계획 모드에서 Shift+Tab으로 빠져나옵니다. BUILD 버튼 자체가 작업 실행 승인이나 권한 상승을 의미하지는 않습니다.
+CLI 제어 참고: [Claude 명령](https://code.claude.com/docs/en/commands), [Claude 권한 모드](https://code.claude.com/docs/en/permission-modes), [Codex 키 설정](https://github.com/openai/codex/blob/main/codex-rs/tui/src/keymap.rs). PLAN은 `/plan`을 전송합니다. BUILD는 계획 모드일 때 Shift+Tab으로 빠져나온 뒤 “작성한 계획대로 구현을 시작해 주세요.”를 자동 전송합니다. 이미 구현 모드이면 모드 전환 없이 같은 구현 요청만 보냅니다. 입력 중인 문장이 있으면 먼저 보내거나 지워야 합니다. BUILD는 구현을 지시하며 CLI 자체의 권한 설정은 변경하지 않습니다. 번호 질문이 표시된 동안에는 기존처럼 해당 번호의 답변 선택이 우선합니다.
 
 ## 버튼별 노브 기능
 
 모드 1의 DENIED는 “현재 제안은 거절합니다. 같은 방법을 반복하지 말고 다른 대안을 제안해 주세요. 새 대안은 바로 실행하지 말고 제 승인을 기다려 주세요.”를 터미널에 전송합니다. 번호 질문이 떠 있을 때는 6번 보기 선택이 우선입니다.
+
+모드 1의 ACCEPT는 일반 대화의 입력란이 비어 있으면 “현재 제안 또는 결과를 승인합니다. 해당 내용에 맞게 진행해 주세요.”를 전송합니다. 작성 중인 답변이나 CLI의 선택 메뉴가 있으면 기존처럼 Enter로 제출·확인합니다. 번호 질문이 표시된 동안에는 번호 답변 선택이 우선합니다.
 
 | 선택한 버튼 | 노브 위치 변화 | 화면 노브 누름 (A0에는 없음) |
 |---|---|---|

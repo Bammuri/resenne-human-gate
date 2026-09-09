@@ -46,7 +46,7 @@ function terminalAnswer(question, choice) {
 function terminalMode(lines) {
   const footer = lines.slice(-8).join("\n");
   if (/plan mode\s*(?:on|·|\(|\[)|\bplan\s*·|⏸\s*plan/i.test(footer)) return "plan";
-  if (/bypass permissions|accept edits|default mode|shift\+tab to plan|gpt-\S+\s+(?:low|medium|high|xhigh)\s*·/i.test(footer)) return "build";
+  if (/bypass permissions|accept edits|default mode|\b(?:auto|manual) mode on\b|shift\+tab to plan|gpt-\S+\s+(?:low|medium|high|xhigh)\s*·/i.test(footer)) return "build";
   return null;
 }
 function terminalWorking(lines) {
@@ -111,9 +111,9 @@ const DECK_MODES = ["agent", "workflow", "custom"];
 const AGENT_KEYS = [
   ["model", "MODEL", "클릭하면 모델 목록 · 노브 추론 강도"],
   ["plan", "PLAN", "계획 모드 · 변경 전 설계"],
-  ["build", "BUILD", "계획 모드를 나와 구현 준비"],
+  ["build", "BUILD", "계획 모드를 나와 작성한 계획 구현 시작"],
   ["check", "CHECK", "테스트 실행 및 요구사항 검증"],
-  ["accept", "ACCEPT", "승인 / 동의"],
+  ["accept", "ACCEPT", "현재 제안·결과 승인 / 입력·메뉴 확인"],
   ["denied", "DENIED", "거절하고 다른 대안 요청"],
   ["stop", "STOP", "대상 AI 중단"],
 ];
