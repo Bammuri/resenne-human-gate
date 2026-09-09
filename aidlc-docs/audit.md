@@ -219,3 +219,11 @@ The following raw user inputs were received (in order) during the session that l
 **Context**: 제출 최종 점검 잔여(마감 9/9 17:00). 사용자 지시(demo 영상 확인·screenshots/ 추가·push). 이번 세션 첫 명시적 push 승인. 영상 직접 검증 불가(ffmpeg 부재) → 팀 문서 + 12개 DOCKPAD 스크린샷 정합성에 근거한 보수적·중립 라벨로 표기하고, 사용자가 정확한 내용을 확인해 라벨을 좁힐 수 있도록 최종 보고에 명시.
 
 ---
+
+## demo.mp4 라벨 확정(DOCKPAD 8키 AI-DLC) + 루트 게이트 경로와 분리 + push
+**Timestamp**: 2026-09-09T16:48:00Z
+**User Input**: "(a) DOCKPAD 8키 AI-DLC 시연 이야" / (연이어) "인라인까지는 안해도 돼 하고 푸시하자"
+**AI Response**: "사용자가 demo.mp4 내용을 **DOCKPAD 8키 AI-DLC 실기기 시연(층위②)**으로 확정 → 이전 보수적·중립 라벨을 정확한 DOCKPAD 라벨로 좁힘. (1) README ## 시연 영상 캡션을 'DOCKPAD(8키) 실기기 AI-DLC 시연 — 실제 Claude Code를 PTY 구동, 물리 키로 단계·승인·거절, 팀 사람 검증·시연/자동 테스트 아님'으로 수정. (2) 하단 note를 '위 영상=DOCKPAD 시연, 루트 2버튼 게이트 ①②③ PTY 경로는 이 영상과 별개'로 명시해 오독 차단. (3) screenshots/README.md: 상단 문단·수록 영상 bullet을 DOCKPAD AI-DLC로 특정, 루트 게이트 절 제목을 '루트 2버튼 게이트 — PTY 키응답 (별도 경로)'로 바꾸고 'demo.mp4는 DOCKPAD 시연이며 루트 게이트와 별개, 루트 경로는 코드·단위·소프트웨어 E2E 테스트와 검증 범위 표로 뒷받침'으로 재작성(미첨부 루트 영상을 약속하지 않음). 인라인 재생 임베드는 사용자 요청대로 하지 않음. audit append 후 커밋·push. 정직 경계: 이제 영상 내용이 사용자 확인으로 검증되어 DOCKPAD 라벨은 근거 있음, 루트 게이트 PTY를 이 영상이 증명한다고 주장하지 않음."
+**Context**: 제출 최종 점검 잔여(마감 9/9 17:00). 앞선 turn에서 보수적 라벨로 push한 뒤 사용자가 영상 내용을 (a)로 확정 → 라벨 정정. 인라인 미적용 지시 반영. push 명시 지시.
+
+---
