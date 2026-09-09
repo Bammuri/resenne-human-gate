@@ -294,9 +294,10 @@ bool beginOled() {
 }
 void renderDisplay() {
   uint32_t now=millis();
+  bool running=bootComplete && displayLinked && runState=="running";
   bool refresh=oledForce || now-oledSuccessAt>=5000;
   if(now-oledAt<(oledReady?250UL:2000UL))return;
-  if(oledReady && !oledDirty && !refresh)return;
+  if(oledReady && !oledDirty && !refresh && !running)return;
   oledAt=millis();oledDirty=false;
   if(!oledReady) {
     clearOledBus();
@@ -314,6 +315,10 @@ void renderDisplay() {
     frame.set(2,apMode?"WIFI SETUP":"BOARD READY");
     String ip=networkReady?WiFi.localIP().toString():"USB READY";
     frame.set(3,ip.c_str());
+  } else if(runState=="question") {
+    frame.set(0,"ANSWER NEEDED");
+    frame.set(1,"CHOOSE KEY 1-7");
+    frame.set(2,"CHECK TERMINAL");
   } else if(profile=="custom") {
     frame.set(0,"MODE 3 SOUND");
     char volume[21];snprintf(volume,sizeof(volume),"VOLUME %d / 30",volumeTarget);
@@ -336,11 +341,13 @@ void renderDisplay() {
   }
   static OledTextFrame previous;
   static bool hasPrevious=false;
-  if(!refresh && hasPrevious && frame.equals(previous))return;
+  static bool previousRunning=false;
+  if(!running && !previousRunning && !refresh && hasPrevious && frame.equals(previous))return;
   display.clearDisplay();
   display.setRotation(0);display.setFont(NULL);display.setTextSize(1);
   display.setTextWrap(false);display.setTextColor(SSD1306_WHITE,SSD1306_BLACK);
-  for(uint8_t row=0;row<OledTextFrame::ROWS;row++) {
+  if(running) OledRunningFrame::draw(display,(uint32_t)(now-workingSince));
+  else for(uint8_t row=0;row<OledTextFrame::ROWS;row++) {
     display.setCursor(OledTextFrame::LEFT,OledTextFrame::rowY(row));
     display.print(frame.lines[row]);
   }
@@ -349,7 +356,7 @@ void renderDisplay() {
   bool wasReady=oledReady;
   oledReady=oledTransport.configure() && oledTransport.frame(display.getBuffer());
   if(!oledReady) { oledFailures++;oledDirty=true;oledForce=true;reportOled();return; }
-  previous=frame;hasPrevious=true;oledForce=false;oledFrames++;oledSuccessAt=millis();
+  previous=frame;previousRunning=running;hasPrevious=true;oledForce=false;oledFrames++;oledSuccessAt=millis();
   if(!wasReady || oledFrames==1)reportOled();
 }
 String statusJson() {

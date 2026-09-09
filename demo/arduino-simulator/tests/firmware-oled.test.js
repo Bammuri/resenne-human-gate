@@ -11,7 +11,7 @@ test('OLED ready requires checked complete-frame transfer, not buffer allocation
 });
 test('OLED idle refresh and failed-transfer recovery cannot be suppressed by text cache', () => {
   assert.match(source, /now-oledSuccessAt>=5000/);
-  assert.match(source, /if\(!refresh && hasPrevious && frame\.equals\(previous\)\)return/);
+  assert.match(source, /if\(!running && !previousRunning && !refresh && hasPrevious && frame\.equals\(previous\)\)return/);
   assert.match(source, /oledRecoveries\+\+;refresh=true/);
   assert.match(source, /oledReady\?250UL:2000UL/);
 });

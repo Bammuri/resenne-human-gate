@@ -75,6 +75,7 @@ dialog.hardware-guide{width:min(920px,calc(100% - 48px));max-width:none;max-heig
 .deck-profile{border:1px solid #7dbb9c;background:#e4f2e9;color:#2a684a;border-radius:7px;padding:8px 10px;font:10px var(--mono);white-space:nowrap}
 .deck-profile[aria-pressed="true"]{background:#254f42;color:#cfffe1}
 .deck-oled svg text{font:8px var(--mono);letter-spacing:0;fill:#90f3cd}
+.deck-oled #deck-oled-running-title{font-size:20px;font-weight:700;fill:#b6ffe4}
 .deck-oled #deck-oled-stage{font-weight:700;fill:#b6ffe4}.deck-oled #deck-oled-status{font-size:8px;fill:#90f3cd}.deck-oled .working{animation:oled-pulse .9s ease-in-out infinite}@keyframes oled-pulse{50%{opacity:.25}}@media(prefers-reduced-motion:reduce){.deck-oled .working{animation:none}}
 .board-status-row{display:flex;flex-wrap:wrap;gap:4px 12px}.board-status-row .response-status{flex:1;min-width:150px}
 /* Connection controls replace the board caption without sizing the shared row. */

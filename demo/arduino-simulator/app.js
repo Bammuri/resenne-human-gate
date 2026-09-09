@@ -5,6 +5,7 @@ const EFFORTS = ["low", "medium", "high", "xhigh"];
 const MODE_NAMES = { workflow: "2 · AI-DLC", agent: "1 · AI CONTROL", custom: "3 · CUSTOM" };
 const deck = new DeckControls(WORKFLOW_KEYS);
 let workflow = null, oledTimer = null, lastOled = "", pendingKey = null, pendingKnob = null;
+let oledWorkingSince = null, oledAnimationTimer = null;
 let configSaving = false, configLoaded = false, questionsPolling = false;
 let questionRenderKey = "", questionInputKey = "", potContext = "";
 let potPosition = null, potAnchor = null;
@@ -52,6 +53,27 @@ function oledState() {
   const detail = question ? `PICK 1–${Math.min(7, question.options.length - deck.page * 7)}` : flow ? AUTONOMY[level] : stage === "model" ? state.effort.toUpperCase() : knobBinding(deck.config.mode, stage, null).label;
   return {stage, level, status, title, detail};
 }
+function animateOled() {
+  if (oledWorkingSince === null) return;
+  const elapsed = Math.max(0, performance.now() - oledWorkingSince);
+  const seconds = Math.floor(elapsed / 1000), phase = Math.floor(elapsed / 250) % 7;
+  $("#deck-oled-elapsed").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  Array.from($("#deck-oled-blocks").children).forEach((block, i) => {
+    block.setAttribute("fill", (i + 7 - phase) % 7 < 3 ? "#90f3cd" : "none");
+  });
+}
+function updateOledActivity(status) {
+  const running = status === "running";
+  $("#deck-oled-normal").setAttribute("visibility", running ? "hidden" : "visible");
+  $("#deck-oled-running").setAttribute("visibility", running ? "visible" : "hidden");
+  if (running && oledWorkingSince === null) {
+    oledWorkingSince = performance.now();
+    animateOled();
+    oledAnimationTimer = setInterval(animateOled, 250);
+  } else if (!running) {
+    clearInterval(oledAnimationTimer); oledAnimationTimer = null; oledWorkingSince = null;
+  }
+}
 function updateOled() {
   const view = oledState(), flow = deck.config.mode === "workflow";
   $("#deck-oled-mode").textContent = flow ? "2 AI-DLC" : deck.config.mode === "custom" ? "3 CUSTOM" : browserTerminal.running ? (browserTerminal.kind.startsWith("claude") ? "1 CLAUDE" : "1 CODEX") : "1 AI";
@@ -68,6 +90,7 @@ function updateOled() {
   }
   $("#deck-oled-indicator").classList.remove("working");
   $("#deck-oled-indicator").setAttribute("visibility", "hidden");
+  updateOledActivity(view.status);
   $("#circuit-stage").dataset.mode = flow ? workflow?.data.stage || "initialization" : browserTerminal.mode;
   $("#circuit-stage").dataset.effort = EFFORTS[flow ? Math.round(view.level * 3 / (AUTONOMY.length - 1)) : view.level];
   clearTimeout(oledTimer); oledTimer = setTimeout(syncOled, 100);
