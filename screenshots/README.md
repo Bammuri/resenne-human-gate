@@ -1,31 +1,43 @@
-# screenshots/ — 시연 증거 촬영 안내 (제출 전 채움)
+# screenshots/ — 시연 증거
 
-> ⚠️ **이 파일은 촬영 안내이지 시연 증거가 아닙니다.** 현재 이 폴더에 실제 증거 이미지·영상은
-> 없습니다. 아래 3컷 + 무음 시연 영상을 제출 전에 이 폴더에 넣고, 루트 `README.md`의
-> `## 시연` 절에서 연결하세요. (이 안내 파일 자체를 완성도 증거로 계산하지 마세요.)
+이 폴더에는 **DOCKPAD(8키 AI 컨트롤러, `demo/arduino-simulator/`) 실기기 시연 스크린샷**과
+**실물 하드웨어 사진**이 들어 있습니다. 루트 `README.md`의 `## 시연` 절에서 연결합니다.
 
-- **제출·검증 하드웨어** = Arduino UNO R4 WiFi + 128×64 SSD1306 OLED + 물리 버튼 2개
-  (✓ **APPROVE** = D2 / ✕ **REJECT** = D3).
-- **팀 실기기 E2E 검증 경로 (경로 B)** = 물리 버튼 → 브리지 → Python PTY → 실제 Claude Code
-  실행 승인·거절. 촬영 시 이 경로가 실제로 동작하는 화면을 담습니다.
+## 정직 경계 (필독)
 
-## 필수 3컷
+- 이 컷들은 **DOCKPAD 앱의 화면**이며, 루트 2버튼 게이트 앱(`server.py`)의 화면이 아닙니다.
+- 실제 Codex·Claude CLI를 PTY에서 구동하고 물리 키(USB 시리얼)로 AI-DLC 단계·승인·거절을
+  전달하는 모습입니다. **이는 팀이 실기기로 확인한 사람 검증·시연 결과이며, 자동 테스트가
+  증명하지 않습니다.** (자동 테스트는 가짜 CLI 프로세스를 사용합니다.)
+- 루트 게이트 앱의 **완전 E2E 검증 경로 = PTY 키응답(USB 시리얼 / 웹 시뮬레이션)**입니다.
+  UNO R4 WiFi Node Bridge(ws:8080) 경로는 **버튼→브리지 왕복까지만 실기기로 확인**했고,
+  Node Bridge↔Python(PTY) 어댑터 통합은 남은 단계라 **초기·대체 설계**입니다. 즉 "물리 버튼 →
+  브리지 → Python PTY → 실제 Claude Code 실행"을 잇는 완결된 실기기 E2E는 아직 아닙니다.
 
-1. **`01-review-waiting.png` — 승인 대기.** Claude Code가 실행 직전 대기하고, 화면(또는 OLED
-   `YOUR TURN` / `PRESS TO APPROVE`)이 사람을 호출하는 순간. 아직 아무 변경도 일어나지 않음.
-2. **`02-approved-running.png` — 승인 후 실행.** ✓ 버튼(D2)을 누른 뒤 실제 코드 변경이 진행되는
-   화면. OLED `AI'S TURN`(진행) 또는 검증 통과 시 `DONE` / `CHECK PASSED`.
-3. **`03-rejected-not-executed.png` — 거절 후 미실행.** 새 요청에서 ✕ 버튼(D3)을 누른 뒤 **해당
-   요청이 실행되지 않았음**을 화면·로그로 확인. (거절은 대기 중인 그 요청에만 적용됩니다.)
+## 수록 이미지
 
-## 무음 시연 영상 (권장)
+- **`hardware-device.jpeg`** — 실물 장치 사진(3D 인클로저 · OLED `MODE 2 AI-DLC` · 자율성 노브 ·
+  사진 키캡 8버튼 · 스피커).
+- **AI-DLC 단계 (모드 1 · AI CONTROL, 실제 Claude Code 구동)**
+  - `dockpad-session-start.png` — Claude Code 세션 시작(v2.1.266 · Opus 4.8).
+  - `dockpad-01-model.png` · `dockpad-02-plan.png` · `dockpad-03-build.png` · `dockpad-04-check.png`
+    — MODEL → PLAN → BUILD → CHECK 각 단계 화면.
+  - `dockpad-plan-progress.png` · `dockpad-build-progress.png` — PLAN/BUILD 진행(OLED `RUNNING`).
+- **사람의 승인·거절·중단 (물리 키)**
+  - `dockpad-05-accept.png` — 검증 결과("…승인할까요, 거절할까요?") 앞 **ACCEPT 승인 전달**.
+  - `dockpad-06-denied.png` — **DENIED 거절** 후 다른 대안 요청(해당 제안 미채택).
+  - `dockpad-07-stop.png` — **STOP** 중단.
+- `dockpad-08-mode.png` — AI CONTROL ↔ AI-DLC **모드 전환** + 검증 결과 화면.
 
-- **`demo.mp4`** — 누르기 직전 침묵 → 클릭 → 실제 변경까지 가능한 한 **끊지 않은 한 컷**.
-  라이브 촬영이 어려우면 사전 촬영본을 쓰되, 재생본임을 영상에 라벨로 표기합니다.
+## 아직 남은 증거 (루트 2버튼 게이트)
+
+루트 HUMAN GATE 게이트 앱의 PTY 키응답 경로를 담은 **무편집 시연 영상**은 별도로 제출 전 추가합니다.
+
+1. **승인 대기** — Claude Code가 실행 직전 대기하고, 화면(또는 OLED `YOUR TURN` /
+   `PRESS TO APPROVE`)이 사람을 호출하는 순간. 아직 아무 변경도 일어나지 않음.
+2. **승인 후 실행** — ✓ 버튼(D2)을 누른 뒤 실제 코드 변경이 진행되는 화면.
+3. **거절 후 미실행** — 새 요청에서 ✕ 버튼(D3)을 누른 뒤 **해당 요청이 실행되지 않았음**을
+   화면·로그로 확인(거절은 대기 중인 그 요청에만 적용).
+
 - 연출 상세(45~55초 컷, 25초 갤러리 영상) = `HACKATHON_EXECUTION_PLAN.md` §3·§4.
-
-## 촬영·재현 절차
-
 - 승인 후 실행 / 거절 후 미실행을 **각 3회 안정 재현**하고 로그를 보존합니다(계획서 §9).
-- 제출 전 완료 기준(Definition of Done) = `HACKATHON_EXECUTION_PLAN.md` §10.
-- 파일명을 위 규칙대로 넣은 뒤, 루트 `README.md` `## 시연` 절의 placeholder를 실제 이미지 링크로 교체하세요.

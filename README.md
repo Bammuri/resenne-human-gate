@@ -54,8 +54,9 @@ DOCKPAD는 **`demo/arduino-simulator/`에 코드로 구현·커밋된 실물 컨
 
 실제 Codex·Claude CLI를 PTY에서 구동하고, 물리 키로 AI-DLC 5단계(Initialization~Operation)를
 승인·진행합니다. 단계별 입력과 AI 결과는 실행 시점에 `aidlc-docs/01-initialization.md`~
-`05-operation.md` 런타임 산출물로 저장합니다. 실제 세션에서 생성하므로 저장소에는 포함하지 않습니다.
-UNO R4 WiFi 연결은 `board_wifi.py`의 **HTTP 직결로 완결된 구현**이며 별도 브리지가 필요 없습니다.
+`05-operation.md`로 저장합니다. 저장소에는 **각 단계 문서의 골격(실행 규칙)만** 포함되며(입력란은
+`_미입력_`), 사용자 입력과 AI 결과는 실제 세션에서 채워집니다. UNO R4 WiFi 연결은 `board_wifi.py`의
+**HTTP 직결로 완결된 구현**이며 별도 브리지가 필요 없습니다.
 
 **소프트웨어 테스트는 가짜 CLI 프로세스를 사용합니다.** 실제 Codex·Claude 응답, 물리 보드와 물리 키를
 통한 AI-DLC 단계 제어는 **팀이 실기기로 확인한 사람 검증·시연 결과**이며 자동 테스트가 증명하지 않습니다.
@@ -186,11 +187,35 @@ claude --settings hooks/hook-gate.settings.example.json
 유지합니다(`vendor/xterm-LICENSE`, `vendor/addon-fit-LICENSE`). 이 라이선스는 물리 하드웨어 설계나
 팀 사진 키캡 이미지의 권리까지 보장하지는 않습니다. **라이선스는 팀 최종 sign-off 대기 상태입니다.**
 
-## 시연 (스크린샷·영상)
+## 시연 (스크린샷)
 
-> 시연 스크린샷과 영상은 현재 미첨부입니다. 제출 전 `screenshots/`에
-> **① 승인 대기 → ② 승인 후 실행 → ③ 거절 후 해당 요청 미실행** 3컷과 무음 시연 영상을 추가하고
-> 이 절에서 연결합니다.
+아래는 **DOCKPAD(8키 AI 컨트롤러, `demo/arduino-simulator/`)를 실기기로 시연한 화면**입니다.
+실제 Claude Code(v2.1.266 · Opus 4.8)를 PTY에서 구동하고 **물리 키 입력(USB 시리얼)**으로
+AI-DLC 단계와 승인·거절을 전달합니다. 이 컷들은 루트 2버튼 게이트 앱이 아니라 DOCKPAD 앱의
+화면이며, **팀이 실기기로 확인한 사람 검증·시연 결과입니다(자동 테스트가 증명하지 않습니다).**
+
+**실물 장치**
+
+![DOCKPAD 실물 장치](screenshots/hardware-device.jpeg)
+
+3D 프린팅 인클로저 · OLED(`MODE 2 AI-DLC`) · 자율성 노브 · 사진 키캡 8버튼 · 스피커.
+
+**실제 Claude Code를 물리 키로 구동 (AI-DLC 단계)**
+
+| PLAN | BUILD | CHECK |
+|---|---|---|
+| ![PLAN 단계](screenshots/dockpad-02-plan.png) | ![BUILD 단계](screenshots/dockpad-03-build.png) | ![CHECK 단계](screenshots/dockpad-04-check.png) |
+| 계획 모드로 진입해 조사·계획만 수행합니다. | 계획대로 실제 코드를 작성합니다. | 테스트·요구사항을 검증하고 결과를 보고합니다. |
+
+**사람의 승인·거절 (물리 키)**
+
+| ① 승인 (ACCEPT) | ② 거절 (DENIED) | ③ 중단 (STOP) |
+|---|---|---|
+| ![ACCEPT](screenshots/dockpad-05-accept.png) | ![DENIED](screenshots/dockpad-06-denied.png) | ![STOP](screenshots/dockpad-07-stop.png) |
+| 검증 결과 앞에서 AI가 사람을 기다리면 ACCEPT 키로 결과를 승인해 진행합니다. | DENIED 키로 현재 제안을 거절하고 다른 대안을 요청합니다(해당 제안 미채택). | STOP 키로 진행 중인 작업을 중단합니다. |
+
+> 루트 2버튼 게이트 앱의 **① 승인 대기 → ② 승인 후 실행 → ③ 거절 후 해당 요청 미실행** PTY
+> 키응답 경로를 담은 무편집 시연 영상은 별도 증거로 제출 전 이 절에 추가합니다.
 
 ---
 
